@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Viewer, Globe, Ellipsoid, Cartesian3, Color, ImageryLayer,
-  UrlTemplateImageryProvider, GeographicTilingScheme, Math as CMath,
+  UrlTemplateImageryProvider, GeographicTilingScheme,
 } from "cesium";
+import Intro from "./Intro";
 import "./landing.css";
+import "./intro.css";
 
 /* ---------- Contenido (edita aquí) ---------- */
 const PROJECT = "Marswalk Atlas";
@@ -33,7 +35,7 @@ const JEZERO = { lon: 77.45, lat: 18.44 };
 const ROUTE = [77.42, 18.4, 77.46, 18.42, 77.5, 18.45, 77.53, 18.5];
 
 /* ---------- Campo de estrellas ---------- */
-function Starfield() {
+function Starfield({ active }: { active: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current!;
@@ -58,18 +60,19 @@ function Starfield() {
         ctx.fillStyle = s.warm ? `rgba(234,184,135,${a})` : `rgba(236,229,216,${a})`;
         ctx.beginPath(); ctx.arc(s.x, s.y - (scrollY * s.r) / 12 % innerHeight, s.r, 0, 6.28); ctx.fill();
       }
-      if (!still) raf = requestAnimationFrame(draw);
+      if (!still && active) raf = requestAnimationFrame(draw);
     };
     resize(); draw(0);
     addEventListener("resize", resize);
     return () => { cancelAnimationFrame(raf); removeEventListener("resize", resize); };
-  }, []);
+  }, [active]);
   return <canvas ref={ref} className="stars" aria-hidden="true" />;
 }
 
 /* ---------- Globo de Marte (CesiumJS) ---------- */
-function MarsGlobe() {
+function MarsGlobe({ active }: { active: boolean }) {
   const host = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<Viewer | null>(null);
   useEffect(() => {
     const viewer = new Viewer(host.current!, {
       globe: new Globe(Ellipsoid.MARS),          // elipsoide marciano
@@ -80,6 +83,8 @@ function MarsGlobe() {
       skyBox: false, skyAtmosphere: false as unknown as undefined,
       contextOptions: { webgl: { alpha: true } },
     });
+    viewerRef.current = viewer;
+    viewer.useDefaultRenderLoop = false;          // se enciende cuando el globo es visible
     const { scene } = viewer;
     scene.backgroundColor = Color.TRANSPARENT;   // deja ver las estrellas
     scene.globe.baseColor = Color.fromCssColorString("#8c3a1e");
@@ -110,19 +115,65 @@ function MarsGlobe() {
     const spin = () => { if (!still) viewer.camera.rotate(Cartesian3.UNIT_Z, -0.0008); };
     scene.postRender.addEventListener(spin);
 
-    return () => { scene.postRender.removeEventListener(spin); viewer.destroy(); };
+    return () => { scene.postRender.removeEventListener(spin); viewerRef.current = null; viewer.destroy(); };
   }, []);
+  // Mientras la intro tapa la página, Cesium no dibuja nada
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (viewer && !viewer.isDestroyed()) viewer.useDefaultRenderLoop = active;
+  }, [active]);
   return <div ref={host} className="globe" role="img" aria-label="Globo interactivo de Marte con una ruta de ejemplo en el cráter Jezero" />;
 }
+
+/* ---------- Parallax por scroll ----------
+   Cada elemento con data-speed se desplaza según su distancia al centro
+   de la pantalla: positivo = más lento que el scroll, negativo = más rápido. */
+function useScrollParallax(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+    const els = Array.from(document.querySelectorAll<HTMLElement>("[data-speed]"));
+    const applied = new Map<HTMLElement, number>();
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const mid = innerHeight / 2;
+      for (const el of els) {
+        const r = el.getBoundingClientRect();
+        const offset = (r.top - (applied.get(el) ?? 0) + r.height / 2 - mid) * -Number(el.dataset.speed);
+        applied.set(el, offset);
+        el.style.translate = `0 ${offset.toFixed(1)}px`;
+      }
+    };
+    const queue = () => { if (!raf) raf = requestAnimationFrame(update); };
+    update();
+    addEventListener("scroll", queue, { passive: true });
+    addEventListener("resize", queue);
+    return () => {
+      cancelAnimationFrame(raf);
+      removeEventListener("scroll", queue);
+      removeEventListener("resize", queue);
+      els.forEach((el) => (el.style.translate = ""));
+    };
+  }, [enabled]);
+}
+
+const REDUCED = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ---------- Página ---------- */
 export default function MarswalkLanding() {
   const [active, setActive] = useState(0);
   const layer = LAYERS[active];
+  const [intro, setIntro] = useState(!REDUCED);       // con movimiento reducido no hay intro
+  const [revealed, setRevealed] = useState(REDUCED);
+  const reveal = useCallback(() => setRevealed(true), []);
+  const finish = useCallback(() => setIntro(false), []);
+  useScrollParallax(revealed && !REDUCED);
 
   return (
     <>
-      <Starfield />
+      <Starfield active={revealed} />
+      {intro && <Intro onReveal={reveal} onDone={finish} />}
+      <div className="site" data-state={revealed ? "in" : "intro"} aria-hidden={!revealed || undefined}>
       <header className="wrap nav">
         <a href="#top" className="brand">{PROJECT}</a>
         <nav aria-label="Principal">
@@ -136,7 +187,7 @@ export default function MarswalkLanding() {
 
       <main id="top">
         <div className="wrap hero">
-          <div>
+          <div data-speed="0.12">
             <h1>El mapa <span>para el primer paso en Marte.</span></h1>
             <p className="lead">Seis misiones de la NASA, una sola vista para planear y recorrer un Marswalk.</p>
             <div className="actions">
@@ -144,8 +195,8 @@ export default function MarswalkLanding() {
               <a className="ghost" href="#reto">Conocer el reto</a>
             </div>
           </div>
-          <div className="globe-frame">
-            <MarsGlobe />
+          <div className="globe-frame" data-speed="-0.08">
+            <MarsGlobe active={revealed} />
             <div className="readout" aria-hidden="true">
               Sitio de referencia <b>Jezero</b><br />
               {JEZERO.lat}°N · {JEZERO.lon}°E<br />
@@ -157,7 +208,7 @@ export default function MarswalkLanding() {
         <section id="reto" className="wrap challenge">
           <div><p className="tag">NASA Space Apps Challenge</p></div>
           <div>
-            <blockquote>
+            <blockquote data-speed="0.05">
               Los primeros astronautas en Marte necesitarán <em>el mejor mapa posible</em>: rutas, destinos y condiciones actuales en un solo lugar.
             </blockquote>
             <p className="src">Reto: una vista en capas, integrada, de un lugar o ruta en la superficie marciana con datos de varias misiones.</p>
@@ -181,7 +232,7 @@ export default function MarswalkLanding() {
               <p>{layer.use}</p>
             </div>
           </div>
-          <div className="stack" aria-hidden="true">
+          <div className="stack" aria-hidden="true" data-speed="-0.1">
             {LAYERS.map((l, i) => (
               <div key={l.name} className="plane" data-on={i === active} style={{ ["--i" as string]: i }}>
                 <span>{l.instrument}</span>
@@ -201,7 +252,7 @@ export default function MarswalkLanding() {
         </section>
 
         <section className="wrap close">
-          <h2>Marte ya está mapeado. Falta hacerlo caminable.</h2>
+          <h2 data-speed="0.08">Marte ya está mapeado. Falta hacerlo caminable.</h2>
           <a className="cta" href={DEMO_URL}>Ver la solución →</a>
           <a className="ghost" href={REPO_URL}>Código en GitHub</a>
         </section>
@@ -213,6 +264,7 @@ export default function MarswalkLanding() {
           <span>Datos: NASA/JPL, USGS, NASA Trek</span>
         </div>
       </footer>
+      </div>
     </>
   );
 }

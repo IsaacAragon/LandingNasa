@@ -1,0 +1,66 @@
+/* ---------- INTRO EN VIDEO ----------
+   Las transformaciones las escribe Intro.tsx en cada frame; aquí solo
+   van estilos estáticos. Nada de filtros ni mezclas sobre el video:
+   todas las capas se componen en la GPU con transform y opacity. */
+.intro {
+  /* Punto del planeta hacia el que se hunde la cámara */
+  --focus-x: 50%; --focus-y: 80%;
+  position: fixed; inset: 0; z-index: 50; overflow: hidden;
+  background: var(--void);
+  contain: strict;
+}
+.intro-layer { position: absolute; inset: -4%; pointer-events: none; will-change: transform; }
+
+.intro-video {
+  display: block; width: 100%; height: 100%; object-fit: cover;
+  transform-origin: var(--focus-x) var(--focus-y);
+  will-change: transform;
+}
+
+/* Halo cálido sobre el horizonte: capa intermedia */
+.intro-glow {
+  background: radial-gradient(40% 32% at var(--focus-x) var(--focus-y), rgba(234, 184, 135, .55), rgba(210, 84, 42, .25) 45%, transparent 72%);
+  transform-origin: var(--focus-x) var(--focus-y);
+  will-change: transform, opacity;
+}
+.intro-vignette { background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(4, 5, 11, .85)); will-change: auto; }
+
+/* Velo final: sustituye al desenfoque y al brillo, cuesta casi nada */
+.intro-flash {
+  opacity: 0;
+  background: radial-gradient(90% 80% at var(--focus-x) var(--focus-y), #e9a877, #b8532c 55%, #3a1810);
+  will-change: opacity;
+}
+
+/* Interfaz de la intro */
+.intro-ui { inset: 0; }
+.intro-coord {
+  position: absolute; left: 2rem; top: 1.6rem;
+  font-family: var(--data); font-size: .75rem; letter-spacing: .08em; color: var(--mute);
+}
+.intro-skip {
+  position: absolute; right: 2rem; bottom: 2rem; pointer-events: auto;
+  display: grid; gap: .6rem; padding: .6rem 0; background: none; border: 0; cursor: pointer;
+  font-family: var(--data); font-size: .8rem; letter-spacing: .12em; text-transform: uppercase; color: var(--bone);
+  text-align: right;
+}
+.intro-bar { display: block; width: 9rem; height: 1px; background: var(--line); }
+.intro-bar i { display: block; height: 100%; background: var(--rust); transform-origin: left; transform: scaleX(0); }
+.intro-skip:hover { color: var(--dust); }
+
+/* Al empezar el zoom la interfaz se retira */
+.intro:not([data-phase="play"]) :is(.intro-coord, .intro-skip) {
+  opacity: 0; translate: 0 16px;
+  transition: opacity .5s ease, translate .8s cubic-bezier(.4, 0, .2, 1);
+}
+/* Salida: la capa entera se funde con el sitio */
+.intro[data-phase="out"] {
+  opacity: 0; pointer-events: none;
+  transition: opacity 1s cubic-bezier(.4, 0, .2, 1);
+}
+
+@media (max-width: 860px) {
+  .intro { --focus-y: 72%; }
+  .intro-coord { left: 1.2rem; }
+  .intro-skip { right: 1.2rem; bottom: 1.4rem; }
+}

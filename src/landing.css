@@ -47,13 +47,19 @@ main, header, footer { position: relative; z-index: 1; }
 .readout { position: absolute; left: -1rem; bottom: 8%; padding: .8rem 1rem; background: rgba(4, 5, 11, .78); border-left: 2px solid var(--rust); font-family: var(--data); font-size: .75rem; line-height: 1.7; }
 .readout b { color: var(--ice); font-weight: 500; }
 
-/* Choreography de carga: una sola secuencia */
+/* Coreografía de entrada: arranca cuando el zoom de la intro entrega la escena.
+   Cada capa llega desde una profundidad distinta (parallax de entrada). */
 @keyframes rise { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
-@keyframes bloom { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
-.hero h1, .hero .lead, .hero .actions { animation: rise .9s cubic-bezier(.2, .7, .2, 1) both; }
-.hero .lead { animation-delay: .15s; }
-.hero .actions { animation-delay: .3s; }
-.globe-frame { animation: bloom 1.6s cubic-bezier(.2, .7, .2, 1) .2s both; }
+@keyframes drop { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
+@keyframes surface { from { opacity: 0; transform: scale(1.35); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes arrive { from { opacity: 0; transform: scale(2.4); filter: blur(14px) brightness(1.6); } to { opacity: 1; transform: none; filter: none; } }
+.site[data-state="intro"] :is(.nav, .hero h1, .hero .lead, .hero .actions, .globe-frame) { opacity: 0; }
+.site[data-state="in"] .nav { animation: drop .9s cubic-bezier(.2, .7, .2, 1) .5s both; }
+.site[data-state="in"] .hero h1 { animation: surface 1.3s cubic-bezier(.16, 1, .3, 1) .15s both; }
+.site[data-state="in"] .hero .lead { animation: rise .9s cubic-bezier(.2, .7, .2, 1) .45s both; }
+.site[data-state="in"] .hero .actions { animation: rise .9s cubic-bezier(.2, .7, .2, 1) .6s both; }
+.site[data-state="in"] .globe-frame { animation: arrive 1.6s cubic-bezier(.16, 1, .3, 1) both; }
+[data-speed] { will-change: translate; }
 
 /* SECCIONES */
 section { padding-block: clamp(5rem, 12vw, 10rem); }
