@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import marsVideo from "./assets/MarsVIdeo.mp4";
 
 /* Segundo del video en el que empieza el zoom al planeta */
@@ -33,11 +33,13 @@ export default function Intro({ onReveal, onDone }: Props) {
   const video = useRef<HTMLVideoElement>(null);
   const flash = useRef<HTMLDivElement>(null);
   const bar = useRef<HTMLElement>(null);
-  const layers = useRef<HTMLDivElement[]>([]);
+  const far = useRef<HTMLDivElement>(null);
+  const mid = useRef<HTMLDivElement>(null);
+  const near = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<Phase>("play");
 
   const zoomStart = useRef<number | null>(null);
-  const skip = useRef(() => { if (zoomStart.current === null) zoomStart.current = -1; }).current;
+  const skip = useCallback(() => { if (zoomStart.current === null) zoomStart.current = -1; }, []);
 
   useEffect(() => {
     const v = video.current!;
@@ -80,12 +82,11 @@ export default function Intro({ onReveal, onDone }: Props) {
 
       cur.x += (target.x - cur.x) * 0.06;
       cur.y += (target.y - cur.y) * 0.06;
-      const [far, mid, near] = layers.current;
-      far.style.transform = `translate3d(${cur.x * -10}px, ${cur.y * -8}px, 0)`;
-      mid.style.transform = `translate3d(${cur.x * -26}px, ${cur.y * -18}px, 0) scale(${glowScale})`;
-      near.style.transform = `translate3d(${cur.x * 14}px, ${cur.y * 10}px, 0)`;
+      far.current!.style.transform = `translate3d(${cur.x * -10}px, ${cur.y * -8}px, 0)`;
+      mid.current!.style.transform = `translate3d(${cur.x * -26}px, ${cur.y * -18}px, 0) scale(${glowScale})`;
+      near.current!.style.transform = `translate3d(${cur.x * 14}px, ${cur.y * 10}px, 0)`;
       v.style.transform = `scale(${scale})`;
-      mid.style.opacity = String(glowOpacity);
+      mid.current!.style.opacity = String(glowOpacity);
       flash.current!.style.opacity = String(flashOpacity);
       raf = requestAnimationFrame(frame);
     };
@@ -117,11 +118,9 @@ export default function Intro({ onReveal, onDone }: Props) {
     };
   }, [skip]);
 
-  const layer = (i: number) => (el: HTMLDivElement | null) => { if (el) layers.current[i] = el; };
-
   return (
     <div className="intro" data-phase={phase} aria-label="Introducción en video">
-      <div ref={layer(0)} className="intro-layer">
+      <div ref={far} className="intro-layer">
         <video
           ref={video}
           className="intro-video"
@@ -132,10 +131,10 @@ export default function Intro({ onReveal, onDone }: Props) {
           aria-hidden="true"
         />
       </div>
-      <div ref={layer(1)} className="intro-layer intro-glow" aria-hidden="true" />
+      <div ref={mid} className="intro-layer intro-glow" aria-hidden="true" />
       <div className="intro-layer intro-vignette" aria-hidden="true" />
       <div ref={flash} className="intro-layer intro-flash" aria-hidden="true" />
-      <div ref={layer(2)} className="intro-layer intro-ui">
+      <div ref={near} className="intro-layer intro-ui">
         <span className="intro-coord" aria-hidden="true">Aproximación · 18.44°N 77.45°E</span>
         <button className="intro-skip" onClick={skip}>
           Entrar

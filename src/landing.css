@@ -1,123 +1,374 @@
-@import url("https://fonts.googleapis.com/css2?family=Unbounded:wght@300;500;800&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap");
-@import "cesium/Build/Cesium/Widgets/widgets.css";
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap");
 
+/* ==========================================================================
+   Aresmap: sistema de diseño
+   Principios heredados de Spartan Gym (SaasGym): obsidiana monocroma,
+   vidrio con bisel especular, cápsulas tipo iOS, tipografía de sistema
+   muy apretada, paralaje multicapa y grano de película.
+   El único color fuerte es Marte: el óxido vive en el planeta, no en la UI.
+
+   Tokens en tres capas: primitivos → semánticos → componentes.
+   ========================================================================== */
+
+/* ---------- 1. Primitivos ---------- */
 :root {
-  --void: #04050b;
-  --basalt: #0d0f18;
-  --rust: #d2542a;
-  --dust: #eab887;
-  --ice: #9ad9e8;
-  --bone: #ece5d8;
-  --mute: #8b8a94;
-  --line: rgba(236, 229, 216, 0.16);
-  --display: "Unbounded", sans-serif;
-  --serif: "Instrument Serif", Georgia, serif;
-  --data: "IBM Plex Mono", ui-monospace, monospace;
+  --obsidian-950: #050505;
+  --obsidian-900: #090808;
+  --obsidian-800: #141212;
+  --platinum-50: #f5f2ec;
+  --platinum-300: #d6cec7;
+  --platinum-500: #b8b0a7;
+  --platinum-700: #78716c;
+  --rust-500: #d2542a;
+  --rust-300: #eab887;
+  --white-a04: rgba(255, 255, 255, 0.04);
+  --white-a07: rgba(255, 255, 255, 0.07);
+  --white-a09: rgba(255, 255, 255, 0.09);
+  --white-a14: rgba(255, 255, 255, 0.14);
+  --white-a22: rgba(255, 255, 255, 0.22);
+  --white-a30: rgba(255, 255, 255, 0.3);
+  --glass-a72: rgba(18, 16, 16, 0.72);
+
+  --font-system: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem;
+  --space-6: 1.5rem; --space-8: 2rem; --space-12: 3rem; --space-16: 4rem;
+
+  --radius-pill: 9999px;
+  --radius-md: 14px;
+  --radius-lg: 24px;
+  --radius-xl: 28px;
+
+  /* Movimiento (improve-animations: curvas fuertes, UI < 300 ms) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-press: 140ms;
+  --dur-ui: 220ms;
+  --dur-reveal: 900ms;
 }
 
+/* ---------- 2. Semánticos ---------- */
+:root {
+  --bg: var(--obsidian-900);
+  --surface: var(--obsidian-800);
+  --surface-glass: var(--glass-a72);
+  --text: var(--platinum-50);
+  --text-muted: var(--platinum-500);
+  --text-subtle: var(--platinum-700);
+  --border: var(--white-a09);
+  --border-strong: var(--white-a22);
+  --highlight: inset 0 1px 0 var(--white-a14);
+  --accent-planet: var(--rust-500);
+  --shadow-float: 0 20px 45px -12px rgba(0, 0, 0, 0.75);
+
+  /* Alias que usa intro.css */
+  --void: var(--obsidian-950);
+  --bone: var(--text);
+  --mute: var(--text-muted);
+  --line: var(--border);
+  --rust: var(--rust-500);
+  --dust: var(--rust-300);
+  --data: var(--font-mono);
+}
+
+/* ---------- 3. Componentes ---------- */
+:root {
+  --btn-height: 50px;
+  --btn-primary-bg: #000;
+  --btn-primary-border: var(--white-a30);
+  --btn-glass-bg: var(--white-a07);
+  --card-bg: rgba(20, 18, 18, 0.62);
+  --card-pad: var(--space-8);
+  --card-radius: var(--radius-xl);
+  --nav-bg: rgba(16, 14, 14, 0.78);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
 * { box-sizing: border-box; margin: 0; }
 html { scroll-behavior: smooth; }
-body { background: var(--void); color: var(--bone); font-family: var(--serif); font-size: 1.25rem; line-height: 1.5; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-system); font-size: 1.0625rem; line-height: 1.6;
+  -webkit-font-smoothing: antialiased; overflow-x: clip;
+}
 a { color: inherit; }
-:focus-visible { outline: 2px solid var(--ice); outline-offset: 4px; }
+:focus-visible { outline: 2px solid var(--white-a30); outline-offset: 4px; }
+[id] { scroll-margin-top: 6rem; }
 
+.wrap { width: min(100% - 2.5rem, 80rem); margin-inline: auto; }
+.site { position: relative; z-index: 2; }
+
+/* Capas de fondo del parallax: estrellas (lejos) → planeta (medio) → grano */
 .stars { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; }
-main, header, footer { position: relative; z-index: 1; }
-.wrap { width: min(1280px, 100% - 3rem); margin-inline: auto; }
+.planet-layer { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+.planet { width: 100%; height: 100%; display: block; transform-origin: 71% 52%; }
+.planet-fallback {
+  position: absolute; right: 8%; top: 50%; width: min(50vw, 76vh); aspect-ratio: 1; translate: 0 -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #e09a5e, #b5532a 45%, #3a160b 80%);
+  box-shadow: 0 0 120px -10px rgba(210, 84, 42, 0.45);
+}
+.grain {
+  position: fixed; inset: 0; z-index: 3; pointer-events: none; opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px;
+}
 
-/* NAV */
-.nav { display: flex; justify-content: space-between; align-items: center; padding-block: 1.5rem; font-family: var(--data); font-size: .8rem; }
-.nav .brand { font-family: var(--display); font-weight: 800; font-size: .95rem; letter-spacing: .04em; text-decoration: none; }
-.nav ul { display: flex; gap: 2rem; list-style: none; padding: 0; }
-.nav a { text-decoration: none; color: var(--mute); transition: color .2s; }
-.nav a:hover { color: var(--bone); }
+.skip {
+  position: fixed; top: var(--space-3); left: var(--space-3); z-index: 99;
+  padding: var(--space-3) var(--space-6); border-radius: var(--radius-pill);
+  background: var(--text); color: var(--obsidian-900); font-weight: 700; text-decoration: none;
+}
+.skip:not(:focus) { clip-path: inset(50%); }
 
-/* HERO */
-.hero { min-height: calc(100svh - 5rem); display: grid; grid-template-columns: 1.05fr 1fr; align-items: center; gap: 2rem; }
-.hero h1 { font-family: var(--display); font-weight: 800; font-size: clamp(2.6rem, 6.4vw, 6rem); line-height: .95; letter-spacing: -.03em; }
-.hero h1 span { display: block; font-weight: 300; color: var(--dust); }
-.hero p.lead { max-width: 30ch; margin-top: 2rem; font-size: clamp(1.4rem, 2.2vw, 1.9rem); font-style: italic; color: var(--dust); }
-.cta { display: inline-flex; gap: .8rem; align-items: center; margin-top: 2.5rem; padding: 1rem 1.6rem; background: var(--rust); color: var(--void); font-family: var(--display); font-weight: 500; font-size: .8rem; text-decoration: none; transition: transform .25s, background .25s; }
-.cta:hover { background: var(--dust); transform: translateX(6px); }
-.ghost { margin-left: 1.5rem; font-family: var(--data); font-size: .85rem; color: var(--mute); }
+/* ==========================================================================
+   Componentes
+   ========================================================================== */
 
-.globe-frame { position: relative; aspect-ratio: 1; width: min(100%, 680px); justify-self: end; margin-right: -4vw; }
-.globe { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; box-shadow: 0 0 120px -20px rgba(210, 84, 42, .45); }
-.globe .cesium-viewer-bottom, .globe .cesium-widget-credits { display: none !important; }
-.readout { position: absolute; left: -1rem; bottom: 8%; padding: .8rem 1rem; background: rgba(4, 5, 11, .78); border-left: 2px solid var(--rust); font-family: var(--data); font-size: .75rem; line-height: 1.7; }
-.readout b { color: var(--ice); font-weight: 500; }
+/* Kicker en cápsula con punto pulsante */
+.kicker {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 0.35rem 0.85rem; border-radius: var(--radius-pill);
+  background: var(--white-a07); border: 1px solid var(--border-strong);
+  color: var(--platinum-300); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-planet); box-shadow: 0 0 10px var(--accent-planet); animation: pulse 2.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.45; transform: scale(0.8); } }
 
-/* Coreografía de entrada: arranca cuando el zoom de la intro entrega la escena.
-   Cada capa llega desde una profundidad distinta (parallax de entrada). */
-@keyframes rise { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
-@keyframes drop { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
-@keyframes surface { from { opacity: 0; transform: scale(1.35); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
-@keyframes arrive { from { opacity: 0; transform: scale(2.4); filter: blur(14px) brightness(1.6); } to { opacity: 1; transform: none; filter: none; } }
-.site[data-state="intro"] :is(.nav, .hero h1, .hero .lead, .hero .actions, .globe-frame) { opacity: 0; }
-.site[data-state="in"] .nav { animation: drop .9s cubic-bezier(.2, .7, .2, 1) .5s both; }
-.site[data-state="in"] .hero h1 { animation: surface 1.3s cubic-bezier(.16, 1, .3, 1) .15s both; }
-.site[data-state="in"] .hero .lead { animation: rise .9s cubic-bezier(.2, .7, .2, 1) .45s both; }
-.site[data-state="in"] .hero .actions { animation: rise .9s cubic-bezier(.2, .7, .2, 1) .6s both; }
-.site[data-state="in"] .globe-frame { animation: arrive 1.6s cubic-bezier(.16, 1, .3, 1) both; }
-[data-speed] { will-change: translate; }
+/* Botones en cápsula: primario obsidiana con borde platino, secundario vidrio */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem;
+  min-height: var(--btn-height); padding: 0.75rem 1.7rem; border-radius: var(--radius-pill);
+  font-size: 0.95rem; font-weight: 700; text-decoration: none; white-space: nowrap;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-ui) ease, border-color var(--dur-ui) ease;
+}
+.btn:active { transform: scale(0.96); }
+.btn-primary {
+  background: var(--btn-primary-bg); color: var(--text); border: 1px solid var(--btn-primary-border);
+  box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.btn-glass {
+  background: var(--btn-glass-bg); color: var(--text); border: 1px solid var(--white-a14);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: var(--highlight);
+}
+.btn-sm { min-height: 40px; padding: 0.4rem 1.1rem; font-size: 0.85rem; }
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover { background: #161618; border-color: rgba(255, 255, 255, 0.5); }
+  .btn-glass:hover { background: var(--white-a14); border-color: var(--border-strong); }
+}
 
-/* SECCIONES */
-section { padding-block: clamp(5rem, 12vw, 10rem); }
-.tag { font-family: var(--data); font-size: .8rem; color: var(--ice); }
-h2 { font-family: var(--display); font-weight: 500; font-size: clamp(1.8rem, 4vw, 3.4rem); line-height: 1.08; letter-spacing: -.02em; }
+/* Tarjeta de vidrio (squircle 28px, bisel especular) */
+.card {
+  position: relative; padding: var(--card-pad); border-radius: var(--card-radius);
+  background: var(--card-bg); border: 1px solid var(--border);
+  backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.12);
+}
+.card-label { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.06em; color: var(--text-muted); }
 
-.challenge { display: grid; grid-template-columns: 1fr 1.6fr; gap: 4rem; border-top: 1px solid var(--line); }
-.challenge blockquote { font-size: clamp(1.6rem, 3vw, 2.5rem); line-height: 1.25; }
-.challenge blockquote em { color: var(--dust); }
-.challenge p.src { margin-top: 1.5rem; font-family: var(--data); font-size: .8rem; color: var(--mute); }
+/* Títulos: muy apretados con degradado platino; el span baja de tono */
+h1, h2 {
+  font-weight: 900; letter-spacing: -0.045em; line-height: 0.92; text-wrap: balance;
+  background: linear-gradient(180deg, #fff 45%, #a8a29e); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+h1 span, h2 span {
+  display: block; -webkit-text-fill-color: var(--text-muted); color: var(--text-muted);
+  font-weight: 600; letter-spacing: -0.03em;
+}
+h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
+.lead { max-width: 46ch; color: var(--text-muted); font-size: clamp(1.02rem, 1.3vw, 1.15rem); line-height: 1.7; text-wrap: pretty; }
+.section-head { display: grid; gap: var(--space-6); justify-items: start; margin-bottom: var(--space-12); }
 
-/* CAPAS */
-.layers { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; border-top: 1px solid var(--line); }
-.layers ul { list-style: none; padding: 0; margin-top: 2.5rem; }
-.layers li button { width: 100%; display: grid; grid-template-columns: 9rem 1fr; text-align: left; padding: 1.1rem 0; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--mute); font: inherit; cursor: pointer; transition: color .25s, padding .25s; }
-.layers li button span:first-child { font-family: var(--display); font-size: .85rem; }
-.layers li button span:last-child { font-family: var(--data); font-size: .75rem; align-self: center; }
-.layers li button[aria-selected="true"] { color: var(--bone); padding-left: 1rem; border-bottom-color: var(--rust); }
-.detail { min-height: 9rem; margin-top: 2rem; }
-.detail p { max-width: 42ch; }
-.detail .src { display: block; margin-bottom: .6rem; font-family: var(--data); font-size: .8rem; color: var(--ice); }
+/* ==========================================================================
+   Encabezado flotante tipo Dynamic Island
+   ========================================================================== */
+.nav-wrap { position: sticky; top: var(--space-4); z-index: 50; pointer-events: none; }
+.nav {
+  pointer-events: auto; width: min(100% - 2rem, 72rem); margin-inline: auto; min-height: 3.6rem;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-6);
+  padding: 0.4rem 0.5rem 0.4rem 1.4rem; border-radius: var(--radius-pill);
+  background: var(--nav-bg); border: 1px solid var(--white-a09);
+  backdrop-filter: blur(28px) saturate(190%); -webkit-backdrop-filter: blur(28px) saturate(190%);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), var(--highlight);
+}
+.brand { font-weight: 900; font-size: 1.05rem; letter-spacing: 0.18em; text-transform: uppercase; text-decoration: none; }
+.nav ul { display: flex; gap: var(--space-1); list-style: none; padding: 0; }
+.nav ul a {
+  display: inline-flex; min-height: 40px; align-items: center; padding: 0 0.95rem; border-radius: var(--radius-pill);
+  color: var(--platinum-300); font-size: 0.86rem; font-weight: 600; text-decoration: none;
+  transition: background-color var(--dur-ui) ease, color var(--dur-ui) ease;
+}
+.nav ul a:hover { background: var(--white-a07); color: var(--text); }
+
+/* ==========================================================================
+   Hero: texto a la izquierda, el planeta (capa fija) gira a la derecha
+   ========================================================================== */
+.hero {
+  position: relative; min-height: calc(100svh - 5rem);
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); align-items: center; gap: var(--space-12);
+  padding-block: var(--space-12) var(--space-16);
+}
+.hero-copy { display: grid; justify-items: start; gap: var(--space-6); }
+.hero h1 { font-size: clamp(3.6rem, 10vw, 9rem); text-transform: uppercase; }
+.hero h1 span { margin-top: var(--space-4); font-size: clamp(1.3rem, 2.4vw, 2rem); text-transform: none; line-height: 1.15; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+
+/* Tarjetas HUD flotantes sobre el planeta */
+.hero-hud { position: relative; height: 100%; min-height: 26rem; }
+.hud-card {
+  position: absolute; display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-4) 1.3rem; border-radius: var(--radius-lg);
+  background: var(--surface-glass); border: 1px solid var(--white-a14);
+  backdrop-filter: blur(24px) saturate(190%); -webkit-backdrop-filter: blur(24px) saturate(190%);
+  box-shadow: var(--shadow-float), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.hud-card:nth-child(1) { right: -2%; top: 14%; }
+.hud-card:nth-child(2) { left: 4%; bottom: 12%; }
+.hud-card b { display: block; font-size: 0.92rem; }
+.hud-card small { display: block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); }
+.hud-icon {
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-md);
+  background: var(--white-a07); border: 1px solid var(--white-a14); font-size: 1.1rem;
+}
+.scroll-cue {
+  position: absolute; left: 50%; bottom: var(--space-6); translate: -50% 0;
+  width: 26px; height: 42px; border-radius: var(--radius-pill); border: 1px solid var(--border-strong);
+}
+.scroll-cue span { position: absolute; left: 50%; top: 8px; width: 3px; height: 8px; margin-left: -1.5px; border-radius: 2px; background: var(--text); animation: cue 1.8s var(--ease-out) infinite; }
+@keyframes cue { 0% { opacity: 0; transform: translateY(0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(14px); } }
+
+/* ==========================================================================
+   Cráter: el planeta se acerca a la izquierda, la info a la derecha
+   ========================================================================== */
+.crater { min-height: 120svh; display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
+.crater-copy { grid-column: 2; display: grid; justify-items: start; gap: var(--space-6); }
+.crater h2 { text-transform: uppercase; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); width: 100%; margin-top: var(--space-2); }
+.fact {
+  padding: 1.1rem 1.2rem; border-radius: 20px; background: var(--card-bg); border: 1px solid var(--border);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: var(--highlight);
+}
+.fact dt { font-size: clamp(1.2rem, 2vw, 1.6rem); font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.fact dd { margin-top: 0.15rem; font-size: 0.85rem; color: var(--text-muted); }
+
+/* ==========================================================================
+   Expedición: bento grid
+   ========================================================================== */
+.expedition { padding-block: clamp(5rem, 10vw, 9rem); }
+.expedition h2, .layers h2, .close h2 { text-transform: uppercase; }
+.bento { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-6); }
+.card-feature { grid-column: span 2; grid-row: span 2; display: grid; align-content: space-between; gap: var(--space-6); }
+.route { width: 100%; height: auto; }
+.route circle { fill: var(--obsidian-900); stroke: var(--text); stroke-width: 2; }
+.route circle:last-of-type { fill: var(--accent-planet); stroke: var(--rust-300); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); border-top: 1px solid var(--border); padding-top: var(--space-6); }
+.stats b { display: block; font-size: clamp(1.5rem, 2.6vw, 2.2rem); font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.stats span { font-size: 0.82rem; color: var(--text-muted); }
+.step { display: grid; align-content: start; gap: var(--space-3); min-height: 13rem; }
+.step-n { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-subtle); }
+.step h3 { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.02em; }
+.step p { font-size: 0.95rem; color: var(--text-muted); }
+
+/* ==========================================================================
+   Capas de datos: control segmentado + pila 3D
+   ========================================================================== */
+.layers { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-16); align-items: center; padding-block: clamp(5rem, 10vw, 9rem); }
+.segmented {
+  display: flex; flex-wrap: wrap; gap: var(--space-1); padding: var(--space-1); border-radius: var(--radius-lg);
+  background: var(--white-a04); border: 1px solid var(--border); width: fit-content;
+}
+.segmented button {
+  min-height: 40px; padding: 0 1rem; border: 0; border-radius: var(--radius-pill); background: none;
+  color: var(--text-muted); font: inherit; font-size: 0.86rem; font-weight: 600; cursor: pointer;
+  transition: background-color var(--dur-ui) var(--ease-out), color var(--dur-ui) ease, transform var(--dur-press) var(--ease-out);
+}
+.segmented button:active { transform: scale(0.96); }
+.segmented button[aria-selected="true"] { background: var(--text); color: var(--obsidian-900); }
+@media (hover: hover) and (pointer: fine) {
+  .segmented button[aria-selected="false"]:hover { color: var(--text); background: var(--white-a07); }
+}
+.detail { margin-top: var(--space-6); min-height: 10rem; display: grid; align-content: start; gap: var(--space-3); }
+.detail p:last-child { max-width: 44ch; }
 
 .stack { position: relative; height: 480px; perspective: 1200px; }
-.plane { position: absolute; inset: 12% 8% auto; height: 200px; border: 1px solid var(--line); transform: rotateX(62deg) rotateZ(-28deg) translateZ(calc(var(--i) * 46px)); transition: transform .6s cubic-bezier(.2, .7, .2, 1), border-color .4s, background .4s, opacity .4s; opacity: .55; background: repeating-linear-gradient(90deg, transparent 0 23px, rgba(236, 229, 216, .07) 23px 24px), repeating-linear-gradient(0deg, transparent 0 23px, rgba(236, 229, 216, .07) 23px 24px); }
-.plane[data-on="true"] { opacity: 1; border-color: var(--rust); background-color: rgba(210, 84, 42, .22); transform: rotateX(62deg) rotateZ(-28deg) translateZ(calc(var(--i) * 46px + 40px)); }
-.plane span { position: absolute; left: .6rem; top: .4rem; font-family: var(--data); font-size: .7rem; transform: rotateZ(0); }
+.plane {
+  position: absolute; inset: 12% 8% auto; height: 200px; border-radius: 18px; border: 1px solid var(--border-strong);
+  transform: rotateX(62deg) rotateZ(-28deg) translateZ(calc(var(--i) * 46px)); opacity: 0.5;
+  background: repeating-linear-gradient(90deg, transparent 0 23px, var(--white-a07) 23px 24px), repeating-linear-gradient(0deg, transparent 0 23px, var(--white-a07) 23px 24px);
+  transition: transform 500ms var(--ease-spring), opacity var(--dur-ui) ease, border-color var(--dur-ui) ease, background-color var(--dur-ui) ease;
+}
+.plane[data-on="true"] {
+  opacity: 1; border-color: var(--rust-300); background-color: rgba(210, 84, 42, 0.2);
+  transform: rotateX(62deg) rotateZ(-28deg) translateZ(calc(var(--i) * 46px + 40px));
+}
+.plane span { position: absolute; left: 0.8rem; top: 0.5rem; font-family: var(--font-mono); font-size: 0.7rem; }
 
-/* RUTA */
-.flow { border-top: 1px solid var(--line); }
-.steps { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 4rem; border-left: 1px solid var(--line); }
-.steps li { list-style: none; padding: 0 1.5rem 2rem; border-right: 1px solid var(--line); }
-.steps li:nth-child(even) { margin-top: 3rem; }
-.steps .n { font-family: var(--data); font-size: .8rem; color: var(--rust); }
-.steps h3 { margin: .8rem 0; font-family: var(--display); font-weight: 500; font-size: 1.15rem; }
-.steps p { font-size: 1.1rem; color: var(--dust); }
+/* ==========================================================================
+   Cierre y pie
+   ========================================================================== */
+.close { padding-block: clamp(4rem, 8vw, 7rem); }
+.close-card { display: grid; gap: var(--space-8); padding: clamp(2rem, 6vw, 5rem); overflow: hidden; }
+.close h2 { font-size: clamp(2.4rem, 6.5vw, 5.6rem); max-width: 14ch; }
+.footer {
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-4);
+  padding-block: var(--space-8); border-top: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-subtle);
+}
 
-/* CIERRE */
-.close { border-top: 1px solid var(--line); text-align: left; }
-.close h2 { max-width: 16ch; font-size: clamp(2.4rem, 7vw, 6.5rem); font-weight: 800; }
-footer { padding-block: 2rem; border-top: 1px solid var(--line); font-family: var(--data); font-size: .75rem; color: var(--mute); }
-footer .wrap { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+/* ==========================================================================
+   Coreografía de entrada (arranca cuando el zoom de la intro entrega la escena)
+   ========================================================================== */
+@keyframes rise { from { opacity: 0; transform: translateY(24px); } }
+@keyframes drop { from { opacity: 0; transform: translateY(-14px) scale(0.97); } }
+@keyframes surface { from { opacity: 0; transform: scale(1.12); filter: blur(8px); } }
+@keyframes arrive { from { opacity: 0; transform: scale(1.6); } }
+.site[data-state="intro"] :is(.nav, .hero-copy > *, .hud-card) { opacity: 0; }
+.site[data-state="in"] .nav { animation: drop var(--dur-reveal) var(--ease-spring) 0.5s both; }
+.site[data-state="in"] .hero-copy > * { animation: rise var(--dur-reveal) var(--ease-spring) both; }
+.site[data-state="in"] .hero-copy > :nth-child(1) { animation-delay: 0.1s; }
+.site[data-state="in"] .hero h1 { animation: surface 1.2s var(--ease-spring) 0.15s both; }
+.site[data-state="in"] .hero-copy > :nth-child(3) { animation-delay: 0.35s; }
+.site[data-state="in"] .hero-copy > :nth-child(4) { animation-delay: 0.45s; }
+.site[data-state="in"] .hud-card { animation: rise var(--dur-reveal) var(--ease-spring) 0.6s both; }
+.site[data-state="in"] .hud-card:nth-child(2) { animation-delay: 0.68s; }
+/* El planeta llega desde el zoom de la intro, en cuanto empieza a dibujarse */
+.planet[data-active="true"] { animation: arrive 1.6s var(--ease-spring) both; }
+[data-speed] { will-change: translate; }
 
-/* MÓVIL */
+/* Revelado al hacer scroll (CSS nativo; sin soporte, todo queda visible) */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .card, .fact, .section-head {
+      animation: reveal linear both; animation-timeline: view(); animation-range: entry 0% entry 55%;
+    }
+    @keyframes reveal { from { opacity: 0; transform: translateY(32px) scale(0.97); } }
+  }
+}
+
+/* ==========================================================================
+   Móvil
+   ========================================================================== */
 @media (max-width: 860px) {
   .nav ul { display: none; }
-  .hero { grid-template-columns: 1fr; padding-top: 1rem; }
-  .globe-frame { order: -1; width: 88%; margin: 0 auto; justify-self: center; }
-  .readout { left: 0; bottom: 0; }
-  .ghost { display: block; margin: 1.2rem 0 0; }
-  .challenge, .layers { grid-template-columns: 1fr; gap: 2.5rem; }
-  .stack { height: 340px; order: -1; }
-  .layers li button { grid-template-columns: 7rem 1fr; }
-  .steps { grid-template-columns: 1fr; }
-  .steps li:nth-child(even) { margin-top: 0; }
-  .steps li { border-bottom: 1px solid var(--line); padding-top: 1.5rem; }
+  .nav { padding-left: 1.1rem; }
+  .hero { grid-template-columns: 1fr; padding-top: 46svh; min-height: 100svh; }
+  .hero-hud { display: none; }
+  .scroll-cue { display: none; }
+  .crater { grid-template-columns: 1fr; min-height: auto; padding-top: 70svh; padding-bottom: var(--space-16); }
+  .crater-copy { grid-column: 1; }
+  .facts { grid-template-columns: 1fr; }
+  .bento { grid-template-columns: 1fr; }
+  .card-feature { grid-column: auto; grid-row: auto; }
+  .layers { grid-template-columns: 1fr; gap: var(--space-8); }
+  .stack { height: 320px; order: -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
   html { scroll-behavior: auto; }
 }
