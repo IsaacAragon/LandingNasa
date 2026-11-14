@@ -196,7 +196,15 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
   backdrop-filter: blur(28px) saturate(190%); -webkit-backdrop-filter: blur(28px) saturate(190%);
   box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), var(--highlight);
 }
-.brand { font-weight: 900; font-size: 1.05rem; letter-spacing: 0.18em; text-transform: uppercase; text-decoration: none; }
+.brand {
+  display: inline-flex; align-items: center; gap: 0.6rem; min-height: 44px;
+  font-weight: 900; font-size: 1.05rem; letter-spacing: 0.18em; text-transform: uppercase; text-decoration: none;
+}
+.brand svg { flex: none; filter: drop-shadow(0 0 10px rgba(210, 84, 42, 0.35)); transition: transform var(--dur-ui) var(--ease-out); }
+@media (hover: hover) and (pointer: fine) { .brand:hover svg { transform: rotate(-12deg) scale(1.06); } }
+/* El destino del logo late como el punto rojo de Gale en el planeta */
+.logo-target { transform-box: fill-box; transform-origin: center; animation: target 2.4s ease-in-out infinite; }
+@keyframes target { 50% { opacity: 0.45; transform: scale(0.75); } }
 .nav ul { display: flex; gap: var(--space-1); list-style: none; padding: 0; }
 .nav ul a {
   display: inline-flex; min-height: 40px; align-items: center; padding: 0 0.95rem; border-radius: var(--radius-pill);
@@ -227,7 +235,7 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
   backdrop-filter: blur(24px) saturate(190%); -webkit-backdrop-filter: blur(24px) saturate(190%);
   box-shadow: var(--shadow-float), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
-.hud-card:nth-child(1) { right: -2%; top: 14%; }
+.hud-card:nth-child(1) { left: 2%; top: 6%; }
 .hud-card:nth-child(2) { left: 4%; bottom: 12%; }
 .hud-card b { display: block; font-size: 0.92rem; }
 .hud-card small { display: block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); }
@@ -245,9 +253,94 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
 /* ==========================================================================
    Cráter: el planeta se acerca a la izquierda, la info a la derecha
    ========================================================================== */
-.crater { min-height: 120svh; display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
-.crater-copy { grid-column: 2; display: grid; justify-items: start; gap: var(--space-6); }
-.crater h2 { text-transform: uppercase; }
+/* Sección alta: el contenido queda fijo mientras el scroll mueve la cámara del planeta */
+.zone { position: relative; height: 340svh; }
+.zone-pin { position: sticky; top: 0; height: 100svh; display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
+.crater-copy { grid-column: 1; max-width: 34rem; display: grid; justify-items: start; gap: var(--space-6); padding-top: var(--space-16); }
+.zone h2, .gale h2 { text-transform: uppercase; }
+
+/* Pasos de la simulación: el planeta escribe data-step en .zone */
+.zone-steps { list-style: none; display: grid; gap: var(--space-1); width: 100%; padding: var(--space-3) var(--space-4); }
+.zone-steps li {
+  display: grid; grid-template-columns: 2rem 1fr; align-items: center; gap: var(--space-3); padding: 0.55rem 0.4rem;
+  border-radius: var(--radius-md); opacity: 0.4; transition: opacity var(--dur-ui) ease, background-color var(--dur-ui) ease;
+}
+.zone-steps b { display: block; font-size: 0.95rem; }
+.zone-steps small { display: block; font-size: 0.8rem; color: var(--text-muted); }
+.zone[data-step="0"] li[data-i="0"], .zone[data-step="1"] li[data-i="1"],
+.zone[data-step="2"] li[data-i="2"], .zone[data-step="3"] li[data-i="3"] { opacity: 1; background: var(--white-a07); }
+.zone[data-step="1"] li[data-i="0"], .zone[data-step="2"] li:is([data-i="0"], [data-i="1"]),
+.zone[data-step="3"] li:not([data-i="3"]) { opacity: 0.75; }
+
+/* Línea de la tarjeta "Cráter Gale" al punto rojo */
+.leader { position: absolute; inset: 0; overflow: visible; }
+.leader path { fill: none; stroke: rgba(255, 120, 90, 0.75); stroke-width: 1.2; stroke-dasharray: 3 4; opacity: 0; }
+
+/* Etiquetas que siguen a los puntos del planeta */
+.pin {
+  position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; will-change: transform, opacity;
+  padding: 0.45rem 0.75rem; border-radius: 12px; white-space: nowrap;
+  background: var(--surface-glass); border: 1px solid var(--white-a14);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: var(--shadow-float);
+  translate: -50% calc(-100% - 22px);
+}
+.pin small { display: block; font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.pin b { font-size: 0.85rem; }
+.pin-goal { translate: 18px -50%; border-color: var(--rust-300); }
+.pin-start { translate: calc(-100% - 18px) -50%; }
+.pin-plain { translate: -50% 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; color: var(--platinum-300); }
+
+/* Gale en datos: bento de 12 columnas. Panorámicas como franjas anchas, fotos pequeñas de a tres. */
+.gale { padding-block: clamp(5rem, 10vw, 9rem); }
+.gale-bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--space-6); }
+.shot { padding: 0; overflow: hidden; display: grid; align-content: start; }
+.shot-media { position: relative; overflow: hidden; background: var(--obsidian-800); }
+.shot-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; scale: 1.14; }
+.shot figcaption { display: grid; gap: 0.3rem; padding: var(--space-4) 1.3rem 1.3rem; }
+.shot figcaption b { font-size: 1.05rem; letter-spacing: -0.01em; }
+.shot figcaption > span:not(.card-label) { font-size: 0.9rem; color: var(--text-muted); max-width: 60ch; }
+.shot small { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-subtle); }
+
+/* Destacada: foto grande con el texto encima */
+.shot-feature { grid-column: span 8; position: relative; }
+.shot-feature .shot-media { height: 100%; min-height: 26rem; }
+.shot-feature figcaption, .shot-strip figcaption {
+  position: absolute; inset: auto 0 0 0; padding: 4rem 1.6rem 1.4rem;
+  background: linear-gradient(transparent, rgba(5, 5, 5, 0.88) 55%);
+}
+.zone-figures { grid-column: span 4; display: grid; align-content: start; gap: var(--space-4); }
+.zone-figures .facts { grid-template-columns: 1fr; margin: 0; }
+.zone-figures .fact { padding: 0.9rem 1rem; }
+
+/* Franja panorámica a todo el ancho */
+.shot-strip { grid-column: 1 / -1; position: relative; }
+.shot-strip .shot-media { aspect-ratio: 5 / 1; min-height: 240px; }
+.shot-small { grid-column: span 4; }
+.shot-small .shot-media { aspect-ratio: 2 / 1; }
+.shot-half { grid-column: span 6; }
+.shot-half .shot-media { aspect-ratio: 3 / 1; }
+.facts.curious { grid-column: 1 / -1; grid-template-columns: repeat(4, 1fr); margin: 0; }
+@media (hover: hover) and (pointer: fine) {
+  .shot img { transition: scale 600ms var(--ease-out); }
+  .shot:hover img { scale: 1.2; }
+}
+
+/* Línea de tiempo horizontal */
+.gale-dates { margin-top: var(--space-6); display: grid; gap: var(--space-6); }
+.htimeline {
+  list-style: none; padding: 0 0 var(--space-4); display: grid; grid-auto-flow: column; grid-auto-columns: minmax(13rem, 1fr);
+  gap: var(--space-6); overflow-x: auto; scroll-snap-type: x proximity; overscroll-behavior-x: contain;
+  scrollbar-width: thin; scrollbar-color: var(--white-a22) transparent;
+  background: linear-gradient(var(--border-strong), var(--border-strong)) 0 0.45rem / 100% 1px no-repeat;
+}
+.htimeline li { position: relative; display: grid; gap: 0.35rem; padding-top: 1.6rem; scroll-snap-align: start; }
+.htimeline li::before {
+  content: ""; position: absolute; left: 0; top: 0.1rem; width: 11px; height: 11px; border-radius: 50%;
+  background: var(--rust-300); box-shadow: 0 0 0 3px var(--obsidian-800);
+}
+.htimeline li:last-child::before { background: var(--rust-500); }
+.htimeline time { font-weight: 800; font-size: 1.05rem; }
+.htimeline span { font-size: 0.88rem; color: var(--text-muted); }
 .facts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); width: 100%; margin-top: var(--space-2); }
 .fact {
   padding: 1.1rem 1.2rem; border-radius: 20px; background: var(--card-bg); border: 1px solid var(--border);
@@ -357,8 +450,19 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
   .hero { grid-template-columns: 1fr; padding-top: 46svh; min-height: 100svh; }
   .hero-hud { display: none; }
   .scroll-cue { display: none; }
-  .crater { grid-template-columns: 1fr; min-height: auto; padding-top: 70svh; padding-bottom: var(--space-16); }
-  .crater-copy { grid-column: 1; }
+  .zone-pin { grid-template-columns: 1fr; align-items: end; padding-bottom: var(--space-6); }
+  .crater-copy { grid-column: 1; padding-top: 0; gap: var(--space-3); }
+  .crater-copy .lead, .planet-note { display: none; }
+  .zone h2 { font-size: 1.9rem; }
+  .zone-steps li:not([data-i]) { display: none; }
+  .gale-bento { grid-template-columns: 1fr; gap: var(--space-4); }
+  .gale-bento > * { grid-column: 1 / -1 !important; }
+  .facts.curious { grid-template-columns: 1fr 1fr; }
+  .shot-strip .shot-media { aspect-ratio: 16 / 9; min-height: 0; }
+  .shot-feature .shot-media { height: auto; min-height: 0; aspect-ratio: 16 / 9; }
+  .shot-feature figcaption, .shot-strip figcaption { position: static; padding: var(--space-4) 1.3rem 1.3rem; background: none; }
+  .pin-start { translate: -50% calc(-100% - 18px); }
+  .pin-plain { display: none; }
   .facts { grid-template-columns: 1fr; }
   .bento { grid-template-columns: 1fr; }
   .card-feature { grid-column: auto; grid-row: auto; }

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Intro from "./Intro";
 import Planet from "./Planet";
-import { GALE } from "./mars";
+import Logo from "./Logo";
+import { GALE, MOUNT_SHARP } from "./mars";
 import {
-  BOXWORK_TIMELINE, DOSE, ELEMENTS, EZ_VOTES, METHANE, MOUNT_SHARP_KM, RADIATION_BARS,
-  REMS_FIELDS, ROUTE_STOPS, SOIL_WATER, STRATA, TRAVERSE,
+  BOXWORK_TIMELINE, DOSE, ELEMENTS, EZ_VOTES, GALE_FACTS, GALE_TIMELINE, GALLERY, METHANE, MOUNT_SHARP_KM,
+  RADIATION_BARS, REMS_FIELDS, ROUTE_STOPS, SOIL_WATER, STRATA, TRAVERSE,
 } from "./data";
 import { BarChart, ChartFrame, ElementsChart, Kpis, MethaneChart, RangeMeter, StrataChart, Timeline } from "./charts";
 import "./landing.css";
@@ -134,12 +135,21 @@ function useScrollParallax(enabled: boolean) {
     const els = Array.from(document.querySelectorAll<HTMLElement>("[data-speed]"));
     const applied = new Map<HTMLElement, number>();
     let raf = 0;
+    const speed = new Map(els.map((el) => [el, Number(el.dataset.speed)]));
     const update = () => {
       raf = 0;
-      const mid = innerHeight / 2;
+      const mid = innerHeight / 2, vh = innerHeight;
+      // Primero se leen todas las posiciones y después se escribe: sin recalcular el layout por elemento
+      const next: [HTMLElement, number][] = [];
       for (const el of els) {
         const r = el.getBoundingClientRect();
-        const offset = (r.top - (applied.get(el) ?? 0) + r.height / 2 - mid) * -Number(el.dataset.speed);
+        const prev = applied.get(el) ?? 0;
+        const top = r.top - prev;
+        if (top > vh * 1.5 || top + r.height < -vh * 0.5) continue;   // lejos de pantalla: no se toca
+        next.push([el, (top + r.height / 2 - mid) * -speed.get(el)!]);
+      }
+      for (const [el, offset] of next) {
+        if (Math.abs((applied.get(el) ?? 0) - offset) < 0.1) continue;
         applied.set(el, offset);
         el.style.translate = `0 ${offset.toFixed(1)}px`;
       }
@@ -157,24 +167,48 @@ function useScrollParallax(enabled: boolean) {
   }, [enabled]);
 }
 
-/* ---------- Mapa esquemático de la ruta segura en Gale ---------- */
-const MAP_STOPS: [number, number][] = [[70, 58], [84, 62], [104, 100], [118, 128], [140, 150], [162, 168]];
+/* ---------- Mapa esquemático de la ruta segura en Gale ----------
+   Mismas posiciones que la ruta dibujada en el planeta (unidades del radio del cráter). */
+const MAP = { x0: -0.75, y0: 0.95, k: 240 };
+const toMap = ([x, y]: [number, number]) => [(x - MAP.x0) * MAP.k, (MAP.y0 - y) * MAP.k] as const;
 function RouteMap() {
-  const d = MAP_STOPS.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" ");
+  const pts = ROUTE_STOPS.map((st) => toMap(st.pos));
+  const d = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  const [cx, cy] = toMap([0, 0]);
+  const [mx, my] = toMap([MOUNT_SHARP.x, MOUNT_SHARP.y]);
   return (
-    <svg className="route-map" viewBox="0 0 320 240" role="img" aria-label="Esquema del cráter Gale con la ruta desde Bradbury Landing hasta los boxwork de Mount Sharp">
-      <circle cx="160" cy="120" r="112" className="rim" />
-      {[64, 46, 30, 15].map((r, i) => (
-        <ellipse key={r} cx="178" cy="150" rx={r * 1.15} ry={r * 0.8} className="contour" style={{ opacity: 0.25 + i * 0.15 }} />
+    <svg className="route-map" viewBox="0 0 312 276" role="img" aria-label="Esquema del noroeste de Gale con la ruta desde Bradbury Landing hasta los boxwork de Mount Sharp">
+      <circle cx={cx} cy={cy} r={MAP.k} className="rim" />
+      {[1, 0.75, 0.5, 0.25].map((f, i) => (
+        <circle key={f} cx={mx} cy={my} r={MOUNT_SHARP.r * MAP.k * f} className="contour" style={{ opacity: 0.25 + i * 0.15 }} />
       ))}
-      <text x="198" y="214" className="map-label">Mount Sharp</text>
+      <text x={mx + 24} y={268} className="map-label">Mount Sharp</text>
       <path d={d} className="route-line" />
-      {MAP_STOPS.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={i === MAP_STOPS.length - 1 ? 6 : 4.5} className={i === MAP_STOPS.length - 1 ? "stop goal" : "stop"} />
+      {pts.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r={i === pts.length - 1 ? 6 : 4.5} className={i === pts.length - 1 ? "stop goal" : i === 0 ? "stop start" : "stop"} />
       ))}
-      <text x="40" y="46" className="map-label">Bradbury</text>
-      <text x="168" y="186" className="map-label strong">Boxwork</text>
+      <text x={pts[0][0] - 8} y={pts[0][1] - 12} className="map-label" textAnchor="end">Bradbury</text>
+      <text x={pts[pts.length - 1][0] + 12} y={pts[pts.length - 1][1] + 4} className="map-label strong">Boxwork</text>
     </svg>
+  );
+}
+
+/* ---------- Imagen de la galería con paralaje interior ---------- */
+type GalleryItem = (typeof GALLERY)[number];
+const img = (id: string) => GALLERY.find((g) => g.id === id)!;
+function Shot({ g, variant }: { g: GalleryItem; variant: "feature" | "strip" | "small" | "half" }) {
+  return (
+    <figure className={`card shot shot-${variant}`}>
+      <div className="shot-media">
+        <img src={g.src} width={g.w} height={g.h} alt={`${g.title}. ${g.text}`} loading="lazy" decoding="async" data-speed="0.05" />
+      </div>
+      <figcaption>
+        <span className="card-label">{g.date} · {g.id}</span>
+        <b>{g.title}</b>
+        <span>{g.text}</span>
+        <small>Imagen: {g.credit}</small>
+      </figcaption>
+    </figure>
   );
 }
 
@@ -193,7 +227,7 @@ export default function MarswalkLanding() {
   return (
     <>
       <Starfield active={revealed} />
-      <Planet active={revealed} focusId="zona" exitId="expedicion" />
+      <Planet active={revealed} focusId="zona" exitId="gale" />
       <div className="grain" aria-hidden="true" />
       {intro && <Intro onReveal={reveal} onDone={finish} />}
 
@@ -202,7 +236,7 @@ export default function MarswalkLanding() {
 
         <header className="nav-wrap">
           <div className="nav">
-            <a href="#top" className="brand">{PROJECT}</a>
+            <a href="#top" className="brand" aria-label={`${PROJECT}, inicio`}><Logo size={30} /><span>{PROJECT}</span></a>
             <nav aria-label="Principal">
               <ul>
                 <li><a href="#zona">La zona</a></li>
@@ -230,7 +264,7 @@ export default function MarswalkLanding() {
               </div>
             </div>
             <div className="hero-hud" aria-hidden="true">
-              <div className="hud-card" data-speed="-0.12">
+              <div className="hud-card" data-speed="-0.12" data-anchor="gale">
                 <span className="hud-icon">◎</span>
                 <span><b>Cráter Gale</b><small>{GALE_COORDS}</small></span>
               </div>
@@ -242,25 +276,62 @@ export default function MarswalkLanding() {
             <a className="scroll-cue" href="#zona" aria-label="Bajar a la zona"><span /></a>
           </section>
 
-          {/* ZONA: el planeta se acerca, traza la ruta de llegada y marca Gale */}
-          <section id="zona" className="wrap crater">
-            <div className="crater-copy">
-              <p className="kicker"><span className="dot" aria-hidden="true" />Zona habitable para astronautas</p>
-              <h2 data-speed="0.06">Gale, <span>un lago que se volvió montaña.</span></h2>
-              <p className="lead">
-                Hace miles de millones de años Gale fue un lago con agua de pH neutro y los elementos que la vida necesita.
-                Hoy es el sitio de Marte mejor medido desde el suelo: radiación, clima y terreno registrados por Curiosity
-                desde 2012. Fue candidato de la NASA para la exploración humana y es nuestro destino.
-              </p>
-              <dl className="facts">
-                {ZONE_FACTS.map((f) => (
-                  <div key={f.label} className="fact">
-                    <dt>{f.value}</dt>
-                    <dd>{f.label}</dd>
-                  </div>
-                ))}
+          {/* ZONA (alta y fijada): zoom al cráter → inicio → destino → ruta óptima simulada */}
+          <section id="zona" className="zone" data-step="0">
+            <div className="wrap zone-pin">
+              <div className="crater-copy">
+                <p className="kicker"><span className="dot" aria-hidden="true" />Zona habitable para astronautas</p>
+                <h2>Gale, <span>un lago que se volvió montaña.</span></h2>
+                <p className="lead">
+                  Un lago antiguo con agua de pH neutro, una montaña de ~{MOUNT_SHARP_KM} km de capas y el terreno de Marte mejor
+                  medido desde el suelo. Fue candidato de la NASA para la exploración humana y es nuestro destino.
+                </p>
+                <ol className="card zone-steps" aria-label="Simulación de la ruta">
+                  <li data-i="0"><span className="step-n">01</span><span><b>Acercamiento</b><small>Gale y Mount Sharp, {GALE_COORDS}</small></span></li>
+                  <li data-i="1"><span className="step-n">02</span><span><b>Inicio</b><small>{ROUTE_STOPS[0].name}: {ROUTE_STOPS[0].what.toLowerCase()}</small></span></li>
+                  <li data-i="2"><span className="step-n">03</span><span><b>Destino</b><small>{ROUTE_STOPS[ROUTE_STOPS.length - 1].name} en la ladera de Mount Sharp</small></span></li>
+                  <li data-i="3"><span className="step-n">04</span><span><b>Ruta óptima</b><small>{ROUTE_STOPS.length} paradas sobre terreno ya recorrido por Curiosity</small></span></li>
+                </ol>
+                <p className="planet-note">Cráter exagerado ~4× y ruta esquemática para que se lean a esta escala.</p>
+              </div>
+            </div>
+          </section>
+
+          {/* GALE EN DATOS: imágenes de la NASA intercaladas con cifras y fechas */}
+          <section id="gale" className="wrap gale">
+            <header className="section-head">
+              <p className="kicker"><span className="dot" aria-hidden="true" />Gale en datos</p>
+              <h2>Un cráter <span>con historia.</span></h2>
+            </header>
+
+            <div className="gale-bento">
+              <Shot g={img("PIA16032")} variant="feature" />
+              <div className="card zone-figures">
+                <p className="card-label">La zona en cifras</p>
+                <dl className="facts">
+                  {ZONE_FACTS.map((f) => <div key={f.label} className="fact"><dt>{f.value}</dt><dd>{f.label}</dd></div>)}
+                </dl>
+              </div>
+
+              <Shot g={img("PIA26552")} variant="strip" />
+
+              <Shot g={img("PIA16099")} variant="small" />
+              <Shot g={img("PIA26632")} variant="small" />
+              <Shot g={img("PIA26306")} variant="small" />
+
+              <dl className="facts curious">
+                {GALE_FACTS.map((f) => <div key={f.label} className="fact"><dt>{f.value}</dt><dd>{f.label}</dd></div>)}
               </dl>
-              <p className="planet-note">En el planeta: trayectoria ilustrativa de llegada a {GALE_COORDS}.</p>
+
+              <Shot g={img("PIA26560")} variant="half" />
+              <Shot g={img("PIA26551")} variant="half" />
+            </div>
+
+            <div className="card gale-dates">
+              <p className="card-label">Gale en fechas</p>
+              <ol className="htimeline" tabIndex={0} aria-label="Línea de tiempo de Gale">
+                {GALE_TIMELINE.map((t) => <li key={t.date}><time>{t.date}</time><span>{t.label}</span></li>)}
+              </ol>
             </div>
           </section>
 

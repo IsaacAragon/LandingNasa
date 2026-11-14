@@ -113,6 +113,7 @@
 @keyframes march { to { stroke-dashoffset: -20; } }
 .route-map .stop { fill: var(--chart-surface); stroke: var(--text); stroke-width: 2; }
 .route-map .goal { fill: var(--chart-accent); stroke: var(--rust-300); }
+.route-map .start { fill: var(--text); }
 .route-map .map-label { fill: var(--text-muted); font-family: var(--font-mono); font-size: 10px; }
 .route-map .strong { fill: var(--text); font-weight: 600; }
 
