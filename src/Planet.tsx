@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { JEZERO } from "./mars";
+import { APPROACH_FROM, GALE } from "./mars";
 
 /**
  * Marte procedural en WebGL2: relieve, cráteres, casquete polar y halo de polvo
@@ -7,7 +7,7 @@ import { JEZERO } from "./mars";
  *
  * Capa fija detrás del contenido. Su posición, tamaño y orientación salen del
  * scroll (parallax): en el hero gira libremente; al llegar a la sección del
- * cráter se acerca, gira hasta dejar Jezero de frente y lo marca.
+ * cráter se acerca, gira hasta dejar Gale de frente, traza la ruta de llegada y lo marca.
  */
 
 
@@ -18,7 +18,7 @@ const FRAG = `#version 300 es
 precision highp float;
 uniform vec2 uCenter; uniform float uRadius;
 uniform float uLon; uniform float uTilt; uniform float uMark; uniform float uTime;
-uniform vec3 uJez;
+uniform vec3 uJez; uniform vec3 uFrom; uniform float uRoute;
 out vec4 o;
 
 float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -60,7 +60,7 @@ void main(){
   float region = fbm(P * 1.6);
   float h = fbm(P * 4.0) * 0.6 + craters(P * 7.0) * 0.22 + craters(P * 17.0) * 0.1;
 
-  // Jezero: depresión exagerada para que se lea a esta escala
+  // Gale: depresión exagerada para que se lea a esta escala
   float dj = acos(clamp(dot(P, uJez), -1.0, 1.0));
   float jr = dj / 0.05;
   h += jr < 1.0 ? (jr * jr - 1.0) * 0.35 : smoothstep(1.35, 1.0, jr) * 0.2;
@@ -83,6 +83,18 @@ void main(){
   float ring = smoothstep(0.012, 0.0, abs(dj - 0.075 - pulse * 0.02)) * (0.6 + 0.4 * pulse);
   float core = smoothstep(0.012, 0.0, abs(dj - 0.052));
   col = mix(col, vec3(0.93, 0.96, 1.0), (ring * 0.8 + core * 0.5) * uMark);
+
+  // Ruta de llegada: arco de círculo máximo que se dibuja con el scroll hasta Gale
+  vec3 an = normalize(cross(uFrom, uJez));
+  float total = acos(clamp(dot(uFrom, uJez), -1.0, 1.0));
+  float along = acos(clamp(dot(P, uFrom), -1.0, 1.0)) / total;
+  float inSeg = step(0.0, dot(cross(uFrom, P), an)) * step(0.0, dot(cross(P, uJez), an));
+  float w = 1.6 / uRadius;
+  float dash = smoothstep(0.35, 0.45, fract(along * 16.0 - uTime * 0.5));
+  float line = smoothstep(w * 1.6, w * 0.4, abs(dot(P, an))) * inSeg * step(along, uRoute) * dash;
+  vec3 head = normalize(mix(uFrom, uJez, uRoute));
+  float headDot = smoothstep(w * 4.0, w * 2.5, acos(clamp(dot(P, head), -1.0, 1.0))) * step(0.01, uRoute) * (1.0 - uMark);
+  col = mix(col, vec3(1.0, 0.86, 0.7), max(line * 0.9, headDot) * term);
 
   float edge = smoothstep(1.0, 1.0 - 1.5 / uRadius, r);
   o = vec4(col * edge, edge);
@@ -130,9 +142,12 @@ export default function Planet({ active, focusId, exitId }: Props) {
     gl.clearColor(0, 0, 0, 0);
     const u = (n: string) => gl.getUniformLocation(prog, n);
     const uCenter = u("uCenter"), uRadius = u("uRadius"), uLon = u("uLon"), uTilt = u("uTilt");
-    const uMark = u("uMark"), uTime = u("uTime"), uJez = u("uJez");
-    const jl = JEZERO.lat * RAD, jo = JEZERO.lon * RAD;
-    gl.uniform3f(uJez, Math.cos(jl) * Math.sin(jo), Math.sin(jl), Math.cos(jl) * Math.cos(jo));
+    const uMark = u("uMark"), uTime = u("uTime"), uJez = u("uJez"), uFrom = u("uFrom"), uRoute = u("uRoute");
+    const unit = (lat: number, lon: number): [number, number, number] =>
+      [Math.cos(lat * RAD) * Math.sin(lon * RAD), Math.sin(lat * RAD), Math.cos(lat * RAD) * Math.cos(lon * RAD)];
+    const jl = GALE.lat * RAD, jo = GALE.lon * RAD;
+    gl.uniform3f(uJez, ...unit(GALE.lat, GALE.lon));
+    gl.uniform3f(uFrom, ...unit(APPROACH_FROM.lat, APPROACH_FROM.lon));
 
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     let dpr = 1, W = 0, H = 0;
@@ -189,7 +204,8 @@ export default function Planet({ active, focusId, exitId }: Props) {
       gl.uniform1f(uRadius, radius * dpr);
       gl.uniform1f(uLon, lon);
       gl.uniform1f(uTilt, tilt);
-      gl.uniform1f(uMark, smooth(clamp01((a - 0.55) / 0.4)));
+      gl.uniform1f(uRoute, smooth(clamp01((a - 0.3) / 0.55)));
+      gl.uniform1f(uMark, smooth(clamp01((a - 0.8) / 0.2)));
       gl.uniform1f(uTime, now / 1000);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     };

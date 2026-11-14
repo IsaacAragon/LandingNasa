@@ -1,9 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Intro from "./Intro";
 import Planet from "./Planet";
-import { JEZERO } from "./mars";
+import { GALE } from "./mars";
+import {
+  BOXWORK_TIMELINE, DOSE, ELEMENTS, EZ_VOTES, METHANE, MOUNT_SHARP_KM, RADIATION_BARS,
+  REMS_FIELDS, ROUTE_STOPS, SOIL_WATER, STRATA, TRAVERSE,
+} from "./data";
+import { BarChart, ChartFrame, ElementsChart, Kpis, MethaneChart, RangeMeter, StrataChart, Timeline } from "./charts";
 import "./landing.css";
 import "./intro.css";
+import "./charts.css";
 
 /* ---------- Contenido (edita aquí) ---------- */
 const PROJECT = "Aresmap";
@@ -11,42 +17,78 @@ const TEAM = "Equipo Aresmap";
 const REPO_URL = "#";
 const DEMO_URL = "#";
 
-interface DataLayer { name: string; mission: string; instrument: string; use: string }
+const fmtLat = (v: number) => `${Math.abs(v)}°${v < 0 ? "S" : "N"}`;
+const GALE_COORDS = `${fmtLat(GALE.lat)} · ${GALE.lon}°E`;
+
+/* Cráter Gale: la zona habitable */
+const ZONE_FACTS = [
+  { value: `~${MOUNT_SHARP_KM} km`, label: "de capas en Mount Sharp que registran el clima" },
+  { value: `${SOIL_WATER.min}–${SOIL_WATER.max} %`, label: "de agua accesible en el suelo (#1022)" },
+  { value: `${DOSE.surface.toLocaleString("es")} mSv/día`, label: "de radiación medida en la superficie" },
+  { value: "3.ª zona", label: "más votada para exploración humana (2015)" },
+];
+
+/* Capas de datos: cada una con su texto, su gráfico y sus fuentes */
+interface DataLayer { name: string; title: string; text: string; sources: string; chart: ReactNode }
 const LAYERS: DataLayer[] = [
-  { name: "Relieve", mission: "Mars Global Surveyor", instrument: "MOLA", use: "Altimetría láser que se convierte en pendientes y cotas. Todo tramo demasiado inclinado sale de la ruta." },
-  { name: "Superficie", mission: "Mars Reconnaissance Orbiter", instrument: "HiRISE", use: "Imágenes a unos 25 cm por píxel. Se ven rocas, dunas y grietas que un astronauta puede pisar." },
-  { name: "Contexto", mission: "Mars Reconnaissance Orbiter", instrument: "CTX", use: "Cobertura a 6 m por píxel para unir el detalle de HiRISE con el mapa completo de la zona." },
-  { name: "Térmica", mission: "Mars Odyssey", instrument: "THEMIS", use: "La inercia térmica distingue roca firme de arena suelta, y con eso, dónde se puede caminar." },
-  { name: "Mineralogía", mission: "Mars Reconnaissance Orbiter", instrument: "CRISM", use: "Minerales hidratados y carbonatos: los puntos donde la ciencia nueva es más probable." },
-  { name: "Clima", mission: "Curiosity", instrument: "REMS y RAD", use: "Temperatura, presión y radiación medidas en superficie para elegir la ventana de salida." },
+  {
+    name: "Geología", title: "Un lago antiguo habitable",
+    text: "En Yellowknife Bay, Curiosity encontró rocas de un lago con pH neutro y poca sal, capaz de sostener microbios quimiolitoautótrofos. Duró, como mínimo, de cientos a decenas de miles de años; cada lago del sistema de deltas y ríos pudo llenar las depresiones hasta ~10 000 años.",
+    sources: "F1, F2",
+    chart: <ElementsChart items={ELEMENTS} />,
+  },
+  {
+    name: "Topografía", title: "Mount Sharp: subir es viajar en el tiempo",
+    text: "Mount Sharp mide ~5 km. Al subir, Curiosity pasó de capas ricas en arcillas a capas con sulfatos, un mineral salado que se forma cuando el agua se seca: el clima se volvía más seco. La base del mapa es el DEM de 1 m por píxel.",
+    sources: "F3, F4, F15",
+    chart: <StrataChart strata={STRATA} km={MOUNT_SHARP_KM} />,
+  },
+  {
+    name: "Objetivo", title: "Boxwork: el objetivo que pone el reto",
+    text: "Crestas bajas que se forman cuando el agua subterránea deja minerales en las grietas de la roca y los cementa. Cubren kilómetros de una capa de Mount Sharp y no se han visto en ninguna otra parte de la montaña. El enunciado del reto los usa como ejemplo de objetivo científico.",
+    sources: "F4, F5, F6",
+    chart: <Timeline items={BOXWORK_TIMELINE} />,
+  },
+  {
+    name: "Muestreo", title: "Orgánicos y metano",
+    text: "SAM detectó materia orgánica conservada en lodolitas de ~3000 millones de años. El metano de fondo sube y baja con las estaciones y tiene picos aislados. Ninguno de los dos hallazgos prueba vida: son puntos de muestreo para la ruta.",
+    sources: "F7, F8, F9",
+    chart: <MethaneChart m={METHANE} />,
+  },
+  {
+    name: "Radiación", title: "Seguridad primero",
+    text: `RAD midió en la superficie ${DOSE.surface.toLocaleString("es")} mSv/día de agosto 2012 a junio 2013: ${(DOSE.cruise / DOSE.surface).toLocaleString("es", { maximumFractionDigits: 1 })} veces menos que durante el viaje. La dosis baja cuando sube la presión, y junto a lomas y buttes el relieve bloquea hasta un 19 %. Las alertas de clima espacial llegan de DONKI.`,
+    sources: "F10, F11, F23, F33, F34",
+    chart: <BarChart rows={RADIATION_BARS} unit="mSv/día" caption="Dosis equivalente media (mSv/día)" />,
+  },
+  {
+    name: "Clima", title: "14 años de datos tomados en el terreno",
+    text: "El JSON público de REMS da, por sol, temperatura del aire y del suelo, presión, opacidad e índice UV. Es un archivo de divulgación: los datos científicos están en el PDS. El registro de posiciones de Curiosity añade elevación e inclinación a lo largo de la ruta.",
+    sources: "F13, F14, F25",
+    chart: (
+      <>
+        <Kpis items={[
+          { value: String(TRAVERSE.years), label: "años de datos" },
+          { value: TRAVERSE.points.toLocaleString("es"), label: "posiciones registradas" },
+          { value: TRAVERSE.sol.toLocaleString("es"), label: "último sol del registro" },
+          { value: `${TRAVERSE.km.toLocaleString("es")} km`, label: "recorridos" },
+        ]} />
+        <ul className="fields">{REMS_FIELDS.map(([k, v]) => <li key={k}><code>{k}</code><span>{v}</span></li>)}</ul>
+      </>
+    ),
+  },
+  {
+    name: "Terreno humano", title: "Candidato a exploración humana",
+    text: "En el taller de NASA sobre sitios de aterrizaje y Zonas de Exploración (2015), Gale tuvo tres propuestas: #1020, #1022 y #1040. La #1020 fue la tercera más votada. La #1022 señala agua accesible en el suelo. USGS publica el DEM de 1 m y una ortofoto de 25 cm para trazar pendientes y la ruta segura.",
+    sources: "F15, F16, F17, F18, F19",
+    chart: (
+      <>
+        <BarChart rows={EZ_VOTES} unit="votos" digits={0} caption="Votos por Zona de Exploración, taller NASA 2015" />
+        <RangeMeter min={SOIL_WATER.min} max={SOIL_WATER.max} scale={5} unit="%" label="Agua en el suelo" />
+      </>
+    ),
+  },
 ];
-const MISSIONS = new Set(LAYERS.map((l) => l.mission)).size;
-
-/* Cráter que modelamos */
-const CRATER_FACTS = [
-  { value: "45 km", label: "de diámetro" },
-  { value: "> 3.500 M", label: "de años: edad del antiguo lago" },
-  { value: "18 feb 2021", label: "aterrizaje de Perseverance" },
-  { value: `${JEZERO.lat}°N · ${JEZERO.lon}°E`, label: "borde occidental de Isidis Planitia" },
-];
-
-/* Expedición: de la órbita a la caminata */
-const STEPS = [
-  { t: "Planear", d: "Elegir destino en el delta y trazar rutas candidatas sobre el relieve." },
-  { t: "Evaluar", d: "Cruzar pendiente, terreno, radiación y clima en cada tramo." },
-  { t: "Salir", d: "Seguir la ruta con las condiciones actualizadas y una vía de retorno." },
-  { t: "Descubrir", d: "Registrar hallazgos nuevos y devolverlos al mapa." },
-];
-
-// Ruta de ejemplo sobre el delta occidental (lon, lat)
-const ROUTE: [number, number][] = [[77.42, 18.4], [77.46, 18.42], [77.5, 18.45], [77.53, 18.5]];
-const MARS_RADIUS_KM = 3389.5;
-const ROUTE_KM = ROUTE.slice(1).reduce((km, [lon, lat], i) => {
-  const [lon0, lat0] = ROUTE[i];
-  const r = Math.PI / 180;
-  const h = Math.sin(((lat - lat0) * r) / 2) ** 2 + Math.cos(lat0 * r) * Math.cos(lat * r) * Math.sin(((lon - lon0) * r) / 2) ** 2;
-  return km + 2 * MARS_RADIUS_KM * Math.asin(Math.sqrt(h));
-}, 0);
 
 /* ---------- Campo de estrellas (capa más lejana del parallax) ---------- */
 function Starfield({ active }: { active: boolean }) {
@@ -115,6 +157,27 @@ function useScrollParallax(enabled: boolean) {
   }, [enabled]);
 }
 
+/* ---------- Mapa esquemático de la ruta segura en Gale ---------- */
+const MAP_STOPS: [number, number][] = [[70, 58], [84, 62], [104, 100], [118, 128], [140, 150], [162, 168]];
+function RouteMap() {
+  const d = MAP_STOPS.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" ");
+  return (
+    <svg className="route-map" viewBox="0 0 320 240" role="img" aria-label="Esquema del cráter Gale con la ruta desde Bradbury Landing hasta los boxwork de Mount Sharp">
+      <circle cx="160" cy="120" r="112" className="rim" />
+      {[64, 46, 30, 15].map((r, i) => (
+        <ellipse key={r} cx="178" cy="150" rx={r * 1.15} ry={r * 0.8} className="contour" style={{ opacity: 0.25 + i * 0.15 }} />
+      ))}
+      <text x="198" y="214" className="map-label">Mount Sharp</text>
+      <path d={d} className="route-line" />
+      {MAP_STOPS.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r={i === MAP_STOPS.length - 1 ? 6 : 4.5} className={i === MAP_STOPS.length - 1 ? "stop goal" : "stop"} />
+      ))}
+      <text x="40" y="46" className="map-label">Bradbury</text>
+      <text x="168" y="186" className="map-label strong">Boxwork</text>
+    </svg>
+  );
+}
+
 const REDUCED = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ---------- Página ---------- */
@@ -130,19 +193,19 @@ export default function MarswalkLanding() {
   return (
     <>
       <Starfield active={revealed} />
-      <Planet active={revealed} focusId="crater" exitId="expedicion" />
+      <Planet active={revealed} focusId="zona" exitId="expedicion" />
       <div className="grain" aria-hidden="true" />
       {intro && <Intro onReveal={reveal} onDone={finish} />}
 
       <div className="site" data-state={revealed ? "in" : "intro"} aria-hidden={!revealed || undefined}>
-        <a className="skip" href="#crater">Saltar al contenido</a>
+        <a className="skip" href="#zona">Saltar al contenido</a>
 
         <header className="nav-wrap">
           <div className="nav">
             <a href="#top" className="brand">{PROJECT}</a>
             <nav aria-label="Principal">
               <ul>
-                <li><a href="#crater">El cráter</a></li>
+                <li><a href="#zona">La zona</a></li>
                 <li><a href="#expedicion">La expedición</a></li>
                 <li><a href="#capas">Datos</a></li>
               </ul>
@@ -154,108 +217,113 @@ export default function MarswalkLanding() {
         <main id="top">
           {/* HERO: el planeta gira a la derecha (capa fija), el texto flota encima */}
           <section className="wrap hero">
-            <div className="hero-copy" data-speed="0.14">
+            <div className="hero-copy" data-speed="0.07">
               <p className="kicker"><span className="dot" aria-hidden="true" />NASA Space Apps Challenge</p>
               <h1>{PROJECT}<span>El mapa para el primer paso en Marte.</span></h1>
               <p className="lead">
-                Seis capas de datos de {MISSIONS} misiones de la NASA en una sola vista para planear y recorrer una caminata en el cráter Jezero.
+                {LAYERS.length} capas de datos de Curiosity, MRO y la NASA en una sola vista para llevar a los primeros astronautas
+                del cráter Gale hasta los boxwork de Mount Sharp.
               </p>
               <div className="actions">
-                <a className="btn btn-primary" href="#crater">Explorar el cráter <span aria-hidden="true">→</span></a>
+                <a className="btn btn-primary" href="#zona">Ver la zona <span aria-hidden="true">→</span></a>
                 <a className="btn btn-glass" href="#expedicion">La expedición</a>
               </div>
             </div>
             <div className="hero-hud" aria-hidden="true">
               <div className="hud-card" data-speed="-0.12">
                 <span className="hud-icon">◎</span>
-                <span><b>Cráter Jezero</b><small>{JEZERO.lat}°N · {JEZERO.lon}°E</small></span>
+                <span><b>Cráter Gale</b><small>{GALE_COORDS}</small></span>
               </div>
               <div className="hud-card" data-speed="-0.22">
                 <span className="hud-icon">≡</span>
-                <span><b>{LAYERS.length} capas integradas</b><small>{MISSIONS} misiones de la NASA</small></span>
+                <span><b>{LAYERS.length} capas integradas</b><small>{TRAVERSE.km.toLocaleString("es")} km de terreno probado</small></span>
               </div>
             </div>
-            <a className="scroll-cue" href="#crater" aria-label="Bajar al cráter"><span /></a>
+            <a className="scroll-cue" href="#zona" aria-label="Bajar a la zona"><span /></a>
           </section>
 
-          {/* CRÁTER: el planeta se acerca y gira hasta dejar Jezero de frente */}
-          <section id="crater" className="wrap crater">
+          {/* ZONA: el planeta se acerca, traza la ruta de llegada y marca Gale */}
+          <section id="zona" className="wrap crater">
             <div className="crater-copy">
-              <p className="kicker"><span className="dot" aria-hidden="true" />El cráter que modelamos</p>
-              <h2 data-speed="0.06">Jezero, <span>un lago seco con memoria.</span></h2>
+              <p className="kicker"><span className="dot" aria-hidden="true" />Zona habitable para astronautas</p>
+              <h2 data-speed="0.06">Gale, <span>un lago que se volvió montaña.</span></h2>
               <p className="lead">
-                Hace más de 3.500 millones de años Jezero fue un lago. Un río dejó un delta en su borde occidental:
-                capas de sedimento donde la vida microbiana, si existió, pudo quedar registrada. Aresmap modela su relieve,
-                sus pendientes y el terreno del delta para saber por dónde se puede caminar.
+                Hace miles de millones de años Gale fue un lago con agua de pH neutro y los elementos que la vida necesita.
+                Hoy es el sitio de Marte mejor medido desde el suelo: radiación, clima y terreno registrados por Curiosity
+                desde 2012. Fue candidato de la NASA para la exploración humana y es nuestro destino.
               </p>
               <dl className="facts">
-                {CRATER_FACTS.map((f) => (
+                {ZONE_FACTS.map((f) => (
                   <div key={f.label} className="fact">
                     <dt>{f.value}</dt>
                     <dd>{f.label}</dd>
                   </div>
                 ))}
               </dl>
+              <p className="planet-note">En el planeta: trayectoria ilustrativa de llegada a {GALE_COORDS}.</p>
             </div>
           </section>
 
-          {/* EXPEDICIÓN */}
+          {/* EXPEDICIÓN: la ruta segura hasta los boxwork */}
           <section id="expedicion" className="wrap expedition">
             <header className="section-head">
               <p className="kicker"><span className="dot" aria-hidden="true" />La expedición</p>
-              <h2>De la órbita <span>a la caminata.</span></h2>
+              <h2>Del lago <span>a los boxwork.</span></h2>
             </header>
             <div className="bento">
               <article className="card card-feature" data-speed="0.04">
-                <p className="card-label">Ruta de ejemplo · delta occidental</p>
-                <svg className="route" viewBox="0 0 320 160" aria-hidden="true">
-                  <defs>
-                    <linearGradient id="rt" x1="0" x2="1"><stop offset="0" stopColor="#f5f2ec" stopOpacity=".3" /><stop offset="1" stopColor="#f5f2ec" /></linearGradient>
-                  </defs>
-                  <path d="M20 130 C 80 120, 110 100, 150 92 S 240 60, 300 24" fill="none" stroke="url(#rt)" strokeWidth="2" strokeDasharray="4 6" />
-                  {[[20, 130], [150, 92], [228, 64], [300, 24]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="4.5" />)}
-                </svg>
+                <p className="card-label">Ruta segura · esquema de Gale</p>
+                <RouteMap />
                 <div className="stats">
-                  <div><b>{ROUTE_KM.toFixed(1)} km</b><span>de recorrido</span></div>
-                  <div><b>{ROUTE.length}</b><span>puntos de paso</span></div>
-                  <div><b>{LAYERS.length}</b><span>capas por tramo</span></div>
+                  <div><b>{TRAVERSE.km.toLocaleString("es")} km</b><span>ya recorridos por Curiosity</span></div>
+                  <div><b>{ROUTE_STOPS.length}</b><span>paradas científicas</span></div>
+                  <div><b>~{MOUNT_SHARP_KM} km</b><span>de montaña por delante</span></div>
                 </div>
               </article>
-              {STEPS.map((s, i) => (
-                <article key={s.t} className="card step" data-speed={i % 2 ? "-0.05" : "0.03"}>
-                  <span className="step-n">0{i + 1}</span>
-                  <h3>{s.t}</h3>
-                  <p>{s.d}</p>
-                </article>
-              ))}
+              <article className="card stops" data-speed="-0.04">
+                <p className="card-label">Paradas, de abajo hacia arriba</p>
+                <ol>
+                  {ROUTE_STOPS.map((s, i) => (
+                    <li key={s.name} data-goal={i === ROUTE_STOPS.length - 1}>
+                      <span className="step-n">0{i + 1}</span>
+                      <span><b>{s.name}</b><small>{s.what}</small></span>
+                      <em>{s.layer}</em>
+                    </li>
+                  ))}
+                </ol>
+              </article>
+              <article className="card why" data-speed="0.03">
+                <p className="card-label">Por qué es la ruta óptima hoy</p>
+                <p>
+                  Cada tramo ya lo recorrió un rover, así que el terreno es transitable sin suposiciones. El siguiente paso es
+                  optimizarla sobre el DEM de 1 m con dos costos: la pendiente y la radiación, buscando el resguardo de lomas
+                  y buttes, donde la dosis baja hasta un 19 %.
+                </p>
+              </article>
             </div>
           </section>
 
-          {/* CAPAS DE DATOS */}
+          {/* CAPAS DE DATOS: cada pestaña con su gráfico */}
           <section id="capas" className="wrap layers">
             <div>
               <header className="section-head">
                 <p className="kicker"><span className="dot" aria-hidden="true" />Capas de datos</p>
-                <h2>Cada misión responde <span>una pregunta distinta.</span></h2>
+                <h2>Cada capa responde <span>una pregunta distinta.</span></h2>
               </header>
               <div className="segmented" role="tablist" aria-label="Capas de datos">
                 {LAYERS.map((l, i) => (
-                  <button key={l.name} role="tab" aria-selected={i === active} onClick={() => setActive(i)}>
+                  <button key={l.name} id={`tab-${i}`} role="tab" aria-selected={i === active} aria-controls="layer-panel" onClick={() => setActive(i)}>
                     {l.name}
                   </button>
                 ))}
               </div>
-              <div className="card detail" role="tabpanel" aria-live="polite">
-                <p className="card-label">{layer.mission} · {layer.instrument}</p>
-                <p>{layer.use}</p>
+              <div className="layer-text">
+                <h3>{layer.title}</h3>
+                <p>{layer.text}</p>
               </div>
             </div>
-            <div className="stack" aria-hidden="true" data-speed="-0.08">
-              {LAYERS.map((l, i) => (
-                <div key={l.name} className="plane" data-on={i === active} style={{ ["--i" as string]: i }}>
-                  <span>{l.instrument}</span>
-                </div>
-              ))}
+            <div className="card layer-panel" id="layer-panel" role="tabpanel" aria-labelledby={`tab-${active}`} key={layer.name}>
+              <ChartFrame title={layer.title} sources={layer.sources}>{layer.chart}</ChartFrame>
             </div>
           </section>
 
@@ -272,7 +340,7 @@ export default function MarswalkLanding() {
 
         <footer className="wrap footer">
           <span>{PROJECT} · {TEAM} · NASA Space Apps Challenge</span>
-          <span>Datos: NASA/JPL, USGS, NASA Trek · Planeta generado por procedimiento</span>
+          <span>Datos: NASA/JPL-Caltech, MSL Curiosity (RAD, REMS, SAM), USGS, DONKI · Planeta generado por procedimiento</span>
         </footer>
       </div>
     </>
