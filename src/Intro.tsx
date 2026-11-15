@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import marsVideo from "./assets/MarsVIdeo.mp4";
+import marsVideo from "./assets/MarsVIdeo.webm";
 
 /* Segundo del video en el que empieza el zoom al planeta */
 const ZOOM_AT = 9;
