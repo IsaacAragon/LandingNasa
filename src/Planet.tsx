@@ -15,18 +15,23 @@ import { ROUTE_STOPS } from "./data";
  */
 
 const VERT = `#version 300 es
-in vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
+layout(location = 0) in vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
 
-const FRAG = `#version 300 es
+/* Utilidades GLSL compartidas por las dos pasadas */
+const COMMON = `#version 300 es
 precision highp float;
 uniform vec2 uCenter; uniform float uRadius;
-uniform float uLon; uniform float uTilt; uniform float uTime;
-uniform vec3 uGale; uniform float uC; uniform vec3 uMount;
-uniform vec2 uStops[6];
-uniform float uA, uB, uRoute, uRover; uniform vec2 uRoverPos;
-uniform float uDetail, uDot;
+uniform float uLon; uniform float uTilt;
+uniform vec3 uGale; uniform float uC;
 out vec4 o;
+mat3 rotY(float a){ float c = cos(a), s = sin(a); return mat3(c, 0, -s, 0, 1, 0, s, 0, c); }
+mat3 rotX(float a){ float c = cos(a), s = sin(a); return mat3(1, 0, 0, 0, c, -s, 0, s, c); }
+`;
 
+/* PASADA 1 · TERRENO (cara): relieve procedural, Gale y Mount Sharp, iluminación.
+   Se dibuja en una textura y solo se repite cuando la cámara se mueve. */
+const TERRAIN_FRAG = COMMON + `
+uniform vec3 uMount; uniform float uDetail;
 float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float noise(vec3 x){
   vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -47,12 +52,6 @@ float craters(vec3 p){
   }
   return h;
 }
-float segDist(vec2 p, vec2 a, vec2 b){
-  vec2 ab = b - a; float t = clamp(dot(p - a, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
-  return length(p - a - ab * t);
-}
-mat3 rotY(float a){ float c = cos(a), s = sin(a); return mat3(c, 0, -s, 0, 1, 0, s, 0, c); }
-mat3 rotX(float a){ float c = cos(a), s = sin(a); return mat3(1, 0, 0, 0, c, -s, 0, s, c); }
 
 void main(){
   vec2 uv = (gl_FragCoord.xy - uCenter) / uRadius;
@@ -69,7 +68,7 @@ void main(){
   // Relieve global
   float region = fbm(P * 1.6);
   float h = fbm(P * 4.0) * 0.6 + craters(P * 7.0) * 0.22 + craters(P * 17.0) * 0.1;
-  // Detalle fino: solo cuando el cráter ocupa bastante pantalla (sin dientes de sierra y menos trabajo de GPU)
+  // Detalle fino: solo cuando el cráter ocupa bastante pantalla
   float fine = 0.5;
   if (uDetail > 0.0) fine = mix(0.5, fbm3(P * 70.0) * 0.5 + craters(P * 48.0) * 0.12 + 0.25, uDetail);
 
@@ -80,10 +79,8 @@ void main(){
   float cr = length(lp), md = 9.0, near = 0.0;
   if (dot(P, uGale) > 0.95 && cr < 1.7){
     near = smoothstep(1.7, 1.25, cr);
-    // Gale: piso, pared, borde y manto de eyecta (borde irregular solo de cerca)
     cr += (noise(P * 220.0) - 0.5) * 0.06 * uDetail;
     float hc = mix(-0.45, 0.0, smoothstep(0.78, 1.0, cr)) + 0.38 * exp(-pow((cr - 1.0) / 0.08, 2.0)) + 0.1 * exp(-pow((cr - 1.18) / 0.18, 2.0));
-    // Mount Sharp: montículo central; borde y terrazas rotos por ruido para que no parezca una diana
     float wob = uDetail > 0.0 ? (fbm3(P * 140.0) - 0.5) * 0.22 * uDetail : 0.0;
     md = (length(lp - uMount.xy) + wob) / uMount.z;
     float mount = md < 1.0 ? pow(1.0 - md, 1.3) * 0.95 : 0.0;
@@ -96,8 +93,6 @@ void main(){
   vec3 alb = mix(dark, mid, smoothstep(0.35, 0.6, region));
   alb = mix(alb, dust, smoothstep(0.55, 0.8, region + h * 0.25) * 0.7);
   alb *= 0.9 + fine * 0.2;
-  // Dentro de Gale: piso algo más oscuro, dunas oscuras al pie de la montaña,
-  // capas de arcillas (rojizas) abajo y sulfatos (claros) arriba
   float floorM = smoothstep(0.95, 0.8, cr) * near;
   alb = mix(alb, alb * 0.82, floorM);
   float dunes = exp(-pow((md - 1.06) / 0.07, 2.0)) * floorM;
@@ -107,8 +102,6 @@ void main(){
   float cap = smoothstep(0.86, 0.93, abs(P.y) + (noise(P * 9.0) - 0.5) * 0.06);
   alb = mix(alb, vec3(0.93, 0.89, 0.84), cap);
 
-  // Normal con relieve (derivadas en pantalla) e iluminación.
-  // El relieve global se limita para que no se exagere al acercarse; el del cráter escala con su tamaño en pantalla.
   float kG = min(uRadius, 900.0) * 0.012;
   float kC = uRadius * uC * 0.35;
   vec3 n = normalize(N + vec3(-dFdx(h), -dFdy(h), 0.0) * mix(kG, kC, near));
@@ -117,8 +110,34 @@ void main(){
   vec3 col = alb * (0.05 + 1.15 * diff * term);
   col += vec3(0.9, 0.42, 0.2) * pow(1.0 - N.z, 3.0) * 0.55 * term;
 
-  // Ruta óptima, puntos de inicio/destino y rover (en coordenadas locales)
-  float px = 1.0 / (uRadius * uC);                 // un píxel en radios del cráter
+  float edge = smoothstep(1.0, 1.0 - 1.5 / uRadius, r);
+  o = vec4(col * edge, edge);
+}`;
+
+/* PASADA 2 · SUPERPOSICIÓN (barata, cada frame): copia la textura del terreno
+   y dibuja encima la ruta, los puntos, el rover y el punto rojo de Gale. */
+const OVERLAY_FRAG = COMMON + `
+uniform sampler2D uTerrain; uniform vec2 uTexScale;
+uniform float uTime; uniform vec2 uStops[6];
+uniform float uA, uB, uRoute, uRover, uDot; uniform vec2 uRoverPos;
+float segDist(vec2 p, vec2 a, vec2 b){
+  vec2 ab = b - a; float t = clamp(dot(p - a, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+  return length(p - a - ab * t);
+}
+void main(){
+  vec4 base = texture(uTerrain, gl_FragCoord.xy * uTexScale);
+  vec2 uv = (gl_FragCoord.xy - uCenter) / uRadius;
+  float r = length(uv);
+  if (r > 1.0 || uA + uB + uRoute + uRover + uDot <= 0.0){ o = base; return; }
+  vec3 N = vec3(uv, sqrt(1.0 - r * r));
+  vec3 P = rotY(uLon) * (rotX(uTilt) * N);
+  if (dot(P, uGale) < 0.9){ o = base; return; }       // lejos de Gale no hay nada que dibujar
+  vec3 east = normalize(cross(vec3(0.0, 1.0, 0.0), uGale));
+  vec3 north = cross(uGale, east);
+  vec2 lp = vec2(dot(P - uGale, east), dot(P - uGale, north)) / uC;
+  vec3 col = base.rgb / max(base.a, 1e-4);
+
+  float px = 1.0 / (uRadius * uC);
   float pulse = 0.5 + 0.5 * sin(uTime * 2.6);
   float d = 1e3;
   for (int i = 0; i < 5; i++){
@@ -126,11 +145,9 @@ void main(){
     if (t <= 0.0) break;
     d = min(d, segDist(lp, uStops[i], mix(uStops[i], uStops[i + 1], t)));
   }
-  float glowLine = smoothstep(px * 7.0, 0.0, d) * 0.35;
-  float line = smoothstep(px * 2.2, px * 0.8, d);
   vec3 routeCol = vec3(1.0, 0.9, 0.78);
-  col = mix(col, vec3(1.0, 0.55, 0.3), glowLine);
-  col = mix(col, routeCol, line);
+  col = mix(col, vec3(1.0, 0.55, 0.3), smoothstep(px * 7.0, 0.0, d) * 0.35);
+  col = mix(col, routeCol, smoothstep(px * 2.2, px * 0.8, d));
   for (int i = 1; i < 5; i++){
     float on = step(float(i) - 0.02, uRoute);
     float dd = length(lp - uStops[i]);
@@ -140,24 +157,20 @@ void main(){
   float dA = length(lp - uStops[0]), dB = length(lp - uStops[5]);
   float ringA = smoothstep(px * 1.6, 0.0, abs(dA - px * (10.0 + 6.0 * pulse))) * uA;
   float ringB = smoothstep(px * 1.6, 0.0, abs(dB - px * (12.0 + 7.0 * pulse))) * uB;
-  float dotA = smoothstep(px * 6.0, px * 4.5, dA) * uA;
-  float dotB = smoothstep(px * 7.0, px * 5.5, dB) * uB;
-  col = mix(col, vec3(0.94, 0.97, 1.0), max(ringA, dotA));
-  col = mix(col, vec3(0.82, 0.33, 0.16), dotB);
+  col = mix(col, vec3(0.94, 0.97, 1.0), max(ringA, smoothstep(px * 6.0, px * 4.5, dA) * uA));
+  col = mix(col, vec3(0.82, 0.33, 0.16), smoothstep(px * 7.0, px * 5.5, dB) * uB);
   col = mix(col, vec3(1.0, 0.8, 0.62), ringB);
   float rov = length(lp - uRoverPos);
   col = mix(col, vec3(1.0), smoothstep(px * 4.5, px * 3.0, rov) * uRover);
   col += vec3(1.0, 0.7, 0.45) * smoothstep(px * 14.0, 0.0, rov) * 0.35 * uRover;
 
-  // Punto rojo parpadeante: ubicación de Gale (con un pulso tipo radar)
   float ping = fract(uTime * 0.7);
   float blink = 0.6 + 0.4 * sin(uTime * 5.0);
   float redDot = smoothstep(px * 5.0, px * 3.2, length(lp)) * blink;
   float redRing = smoothstep(px * 1.6, 0.0, abs(length(lp) - px * (6.0 + 24.0 * ping))) * (1.0 - ping);
   col = mix(col, vec3(1.0, 0.22, 0.12), max(redDot, redRing * 0.85) * uDot);
 
-  float edge = smoothstep(1.0, 1.0 - 1.5 / uRadius, r);
-  o = vec4(col * edge, edge);
+  o = vec4(col * base.a, base.a);
 }`;
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
@@ -209,29 +222,54 @@ export default function Planet({ active, focusId, exitId }: Props) {
       if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
       return s;
     };
-    const prog = gl.createProgram()!;
-    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VERT));
-    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
-    gl.linkProgram(prog);
-    gl.useProgram(prog);
+    const vert = sh(gl.VERTEX_SHADER, VERT);
+    const program = (frag: string) => {
+      const pr = gl.createProgram()!;
+      gl.attachShader(pr, vert); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, frag)); gl.linkProgram(pr);
+      if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(pr));
+      const loc = (n: string) => gl.getUniformLocation(pr, n);
+      return { pr, loc };
+    };
+    const T = program(TERRAIN_FRAG), O = program(OVERLAY_FRAG);
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(prog, "p");
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.enable(gl.SCISSOR_TEST);
     gl.clearColor(0, 0, 0, 0);
-    const u = (n: string) => gl.getUniformLocation(prog, n);
-    const U = {
-      center: u("uCenter"), radius: u("uRadius"), lon: u("uLon"), tilt: u("uTilt"), time: u("uTime"),
-      a: u("uA"), b: u("uB"), route: u("uRoute"), rover: u("uRover"), roverPos: u("uRoverPos"),
-      detail: u("uDetail"), dot: u("uDot"),
-    };
+
     const G = unit(GALE.lat, GALE.lon);
-    gl.uniform3f(u("uGale"), ...G);
-    gl.uniform1f(u("uC"), CRATER_ANGLE);
-    gl.uniform3f(u("uMount"), MOUNT_SHARP.x, MOUNT_SHARP.y, MOUNT_SHARP.r);
-    gl.uniform2fv(u("uStops"), new Float32Array(STOPS.flat()));
+    for (const { pr, loc } of [T, O]) {
+      gl.useProgram(pr);
+      gl.uniform3f(loc("uGale"), ...G);
+      gl.uniform1f(loc("uC"), CRATER_ANGLE);
+    }
+    gl.useProgram(T.pr);
+    gl.uniform3f(T.loc("uMount"), MOUNT_SHARP.x, MOUNT_SHARP.y, MOUNT_SHARP.r);
+    gl.useProgram(O.pr);
+    gl.uniform2fv(O.loc("uStops"), new Float32Array(STOPS.flat()));
+    gl.uniform1i(O.loc("uTerrain"), 0);
+    const UT = { center: T.loc("uCenter"), radius: T.loc("uRadius"), lon: T.loc("uLon"), tilt: T.loc("uTilt"), detail: T.loc("uDetail") };
+    const UO = {
+      center: O.loc("uCenter"), radius: O.loc("uRadius"), lon: O.loc("uLon"), tilt: O.loc("uTilt"), time: O.loc("uTime"),
+      texScale: O.loc("uTexScale"), a: O.loc("uA"), b: O.loc("uB"), route: O.loc("uRoute"), rover: O.loc("uRover"),
+      roverPos: O.loc("uRoverPos"), dot: O.loc("uDot"),
+    };
+
+    // Textura donde se guarda el terreno ya calculado
+    const tex = gl.createTexture()!;
+    const fbo = gl.createFramebuffer()!;
+    const allocTerrain = () => {
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, cv.width, cv.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    };
 
     // Base local de Gale (igual que en el shader) para proyectar las etiquetas
     const east: V3 = (() => { const e: V3 = [G[2], 0, -G[0]]; const l = Math.hypot(...e); return [e[0] / l, 0, e[2] / l]; })();
@@ -258,7 +296,10 @@ export default function Planet({ active, focusId, exitId }: Props) {
       dpr = Math.min(devicePixelRatio || 1, 1.25);    // el shader es caro: 1.25 basta para un planeta suave
       W = innerWidth; H = innerHeight;
       cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      allocTerrain();
+      terrainKey = "";                               // el terreno se recalcula con el nuevo tamaño
     };
+    let terrainKey = "", terrainScale = 1, stillFrames = 0;
     resize();
     addEventListener("resize", resize);
 
@@ -308,7 +349,7 @@ export default function Planet({ active, focusId, exitId }: Props) {
       const x1 = narrow ? W * 0.5 : W * 0.7, y1 = narrow ? H * 0.3 : H * 0.5;
       const z = smooth(clamp01(p / 0.3));
       const radius = lerp(r0, r1, a) * Math.pow(r2 / r1, z);       // zoom logarítmico: se siente uniforme
-      const par = 1 - z * 0.7;                                     // menos paralaje de puntero de cerca
+      const par = 1 - z;                                           // sin paralaje de puntero de cerca: la cámara queda quieta
       // De cerca, la cámara se centra en la ruta (noroeste del cráter), no en el centro de Gale
       const focusX = narrow ? W * 0.5 : W * 0.7, focusY = narrow ? H * 0.26 : H * 0.5;
       const shiftX = (focusX - x1 + ROUTE_CENTER[0] * -craterPx) * z;
@@ -325,24 +366,56 @@ export default function Planet({ active, focusId, exitId }: Props) {
       const rp = roverOn > 0 ? along(reduced ? 1 : roverT) : STOPS[0];
 
       const R = Math.min(radius * 1.35, Math.hypot(W, H) * 2) * dpr;
+      const detail = smooth(clamp01((radius * CRATER_ANGLE * dpr - 140) / 260));
+      const dotOn = 1 - smooth(clamp01((p - 0.22) / 0.1));
+
+      // PASADA 1: el terreno solo se recalcula si la cámara se movió (medio píxel o un ángulo mínimo).
+      // Mientras se mueve y el planeta ocupa mucha pantalla se calcula a media resolución;
+      // al quedarse quieto unos frames se repite a resolución completa.
+      const key = [lon.toFixed(4), tilt.toFixed(4), (radius * dpr).toFixed(1), (cx * dpr * 2).toFixed(0), (cy * dpr * 2).toFixed(0), detail.toFixed(3)].join("|");
+      const moved = key !== terrainKey;
+      stillFrames = moved ? 0 : stillFrames + 1;
+      const big = radius * dpr > Math.max(cv.width, cv.height) * 0.6;
+      if (moved || (terrainScale < 1 && stillFrames > 4)) {
+        terrainScale = moved && big ? 0.5 : 1;
+        terrainKey = key;
+        const k = terrainScale;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.viewport(0, 0, Math.ceil(cv.width * k), Math.ceil(cv.height * k));
+        gl.scissor(0, 0, cv.width, cv.height);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.scissor(Math.max(0, Math.floor((cx * dpr - R) * k)), Math.max(0, Math.floor(((H - cy) * dpr - R) * k)), Math.ceil(R * 2 * k), Math.ceil(R * 2 * k));
+        gl.useProgram(T.pr);
+        gl.uniform2f(UT.center, cx * dpr * k, (H - cy) * dpr * k);
+        gl.uniform1f(UT.radius, radius * dpr * k);
+        gl.uniform1f(UT.lon, lon);
+        gl.uniform1f(UT.tilt, tilt);
+        gl.uniform1f(UT.detail, detail);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      }
+
+      // PASADA 2: copia del terreno + ruta, puntos, rover y punto rojo (cada frame, barata)
       const bx = Math.max(0, Math.floor(cx * dpr - R)), by = Math.max(0, Math.floor((H - cy) * dpr - R));
       gl.viewport(0, 0, cv.width, cv.height);
       gl.scissor(0, 0, cv.width, cv.height);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.scissor(bx, by, Math.ceil(R * 2), Math.ceil(R * 2));
-      gl.uniform2f(U.center, cx * dpr, (H - cy) * dpr);
-      gl.uniform1f(U.radius, radius * dpr);
-      gl.uniform1f(U.lon, lon);
-      gl.uniform1f(U.tilt, tilt);
-      gl.uniform1f(U.time, now / 1000);
-      gl.uniform1f(U.a, A);
-      gl.uniform1f(U.b, B);
-      gl.uniform1f(U.route, route);
-      gl.uniform1f(U.rover, roverOn);
-      gl.uniform2f(U.roverPos, rp[0], rp[1]);
-      gl.uniform1f(U.detail, smooth(clamp01((radius * CRATER_ANGLE * dpr - 140) / 260)));
-      const dotOn = 1 - smooth(clamp01((p - 0.22) / 0.1));
-      gl.uniform1f(U.dot, dotOn);
+      gl.useProgram(O.pr);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.uniform2f(UO.texScale, terrainScale / cv.width, terrainScale / cv.height);
+      gl.uniform2f(UO.center, cx * dpr, (H - cy) * dpr);
+      gl.uniform1f(UO.radius, radius * dpr);
+      gl.uniform1f(UO.lon, lon);
+      gl.uniform1f(UO.tilt, tilt);
+      gl.uniform1f(UO.time, now / 1000);
+      gl.uniform1f(UO.a, A);
+      gl.uniform1f(UO.b, B);
+      gl.uniform1f(UO.route, route);
+      gl.uniform1f(UO.rover, roverOn);
+      gl.uniform2f(UO.roverPos, rp[0], rp[1]);
+      gl.uniform1f(UO.dot, dotOn);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
       // Etiquetas HTML sobre los puntos
