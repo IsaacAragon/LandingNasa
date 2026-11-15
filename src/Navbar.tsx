@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import Logo from "./Logo";
 import { scrollTop, viewportHeight } from "./scroll";
 import { getPerf, setPerfMode, subscribePerf, usePerf } from "./perf";
+import { useBi, useLang, useT, type Bi } from "./i18n";
 
-interface Link { id: string; label: string }
+interface Link { id: string; label: Bi }
 
 /**
  * Barra superior tipo plano técnico: línea fina, secciones numeradas en monoespaciada,
@@ -14,6 +15,8 @@ export default function Navbar({ project, links, ctaHref }: { project: string; l
   const [scrolled, setScrolled] = useState(false);
   const bar = useRef<HTMLElement>(null);
   const firstId = links[0]?.id;
+  const bi = useBi();
+  const t = useT();
 
   // Sección activa: la que cruza la franja central de la pantalla
   useEffect(() => {
@@ -27,7 +30,7 @@ export default function Navbar({ project, links, ctaHref }: { project: string; l
   }, [links]);
 
   // Fondo al bajar y progreso de lectura. Las medidas (alto de la página y posición de la primera
-  // sección) se toman solo al cambiar el tamaño; en cada scroll se usa scrollY, sin medir el layout.
+  // sección) se toman solo al cambiar el tamaño; en cada scroll se usa la posición ya leída.
   useEffect(() => {
     let raf = 0, max = 1, firstTop = 0;
     const measure = () => {
@@ -55,29 +58,41 @@ export default function Navbar({ project, links, ctaHref }: { project: string; l
   return (
     <header className="topbar" data-scrolled={scrolled}>
       <div className="wrap topbar-inner">
-        <a href="#top" className="brand" aria-label={`${project}, inicio`}>
+        <a href="#top" className="brand" aria-label={`${project}, ${t("inicio", "home")}`}>
           <Logo size={26} />
           <span className="brand-name">{project}</span>
           <span className="brand-meta" aria-hidden="true">Gale · 5.4°S 137.8°E</span>
         </a>
-        <nav aria-label="Principal">
+        <nav aria-label={t("Principal", "Main")}>
           <ol>
             {links.map((l, i) => (
               <li key={l.id}>
                 <a href={`#${l.id}`} aria-current={active === l.id ? "location" : undefined}>
-                  <span aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>{l.label}
+                  <span aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>{bi(l.label)}
                 </a>
               </li>
             ))}
           </ol>
         </nav>
         <div className="topbar-actions">
+          <LangSwitch />
           <PerfToggle />
-          <a className="topbar-cta" href={ctaHref}>Ver demo <span aria-hidden="true">↗</span></a>
+          <a className="topbar-cta" href={ctaHref}>{t("Ver demo", "View demo")} <span aria-hidden="true">↗</span></a>
         </div>
       </div>
       <i className="topbar-progress" ref={bar} aria-hidden="true" />
     </header>
+  );
+}
+
+/* ---------- Selector de idioma: enlaces reales a / (inglés) y /es/ (español) ---------- */
+function LangSwitch() {
+  const [lang] = useLang();
+  return (
+    <div className="lang" role="group" aria-label="Language / Idioma">
+      <a href="/" hrefLang="en" lang="en" className="lang-btn" aria-current={lang === "en" ? "true" : undefined}>EN</a>
+      <a href="/es/" hrefLang="es" lang="es" className="lang-btn" aria-current={lang === "es" ? "true" : undefined}>ES</a>
+    </div>
   );
 }
 
@@ -86,6 +101,8 @@ export default function Navbar({ project, links, ctaHref }: { project: string; l
    Si se activó solo, el título explica por qué; si se activó al medir los fps, avisa una vez. */
 function PerfToggle() {
   const perf = usePerf();
+  const bi = useBi();
+  const t = useT();
   const [notice, setNotice] = useState(false);
 
   // Aviso cuando la medición de fps lo activa mientras se navega (no al cargar por hardware)
@@ -103,10 +120,11 @@ function PerfToggle() {
     return () => { off(); clearTimeout(timer); };
   }, []);
 
-  const why = perf.auto && perf.mode === "auto" ? `Activado automáticamente: ${perf.reasons.join(", ")}.` : "";
+  const why = perf.auto && perf.mode === "auto" ? `${t("Activado automáticamente", "Turned on automatically")}: ${perf.reasons.map(bi).join(", ")}.` : "";
   const title = perf.lite
-    ? `Modo rendimiento activado. ${why} Pulsa para ver todos los efectos.`
-    : "Modo rendimiento: menos efectos para que el scroll vaya fluido en equipos modestos.";
+    ? `${t("Modo rendimiento activado.", "Performance mode is on.")} ${why} ${t("Pulsa para ver todos los efectos.", "Click to see all effects.")}`
+    : t("Modo rendimiento: menos efectos para que el scroll vaya fluido en equipos modestos.", "Performance mode: fewer effects so scrolling stays smooth on modest devices.");
+  const last = perf.reasons[perf.reasons.length - 1];
   return (
     <div className="perf">
       <button
@@ -117,13 +135,13 @@ function PerfToggle() {
         onClick={() => { setNotice(false); setPerfMode(perf.lite ? "off" : "on"); }}
       >
         <span className="perf-dot" aria-hidden="true" />
-        <span className="perf-label">Rendimiento</span>
+        <span className="perf-label">{t("Rendimiento", "Performance")}</span>
         <span className="perf-state">{perf.lite ? (perf.mode === "auto" ? "auto" : "on") : "off"}</span>
       </button>
-      {notice && (
+      {notice && last && (
         <p className="perf-notice" role="status">
-          Activamos el modo rendimiento ({perf.reasons[perf.reasons.length - 1]}) para que el scroll vaya fluido.
-          <button type="button" onClick={() => { setNotice(false); setPerfMode("off"); }}>Ver todos los efectos</button>
+          {t("Activamos el modo rendimiento", "We turned on performance mode")} ({bi(last)}) {t("para que el scroll vaya fluido.", "so scrolling stays smooth.")}
+          <button type="button" onClick={() => { setNotice(false); setPerfMode("off"); }}>{t("Ver todos los efectos", "See all effects")}</button>
         </p>
       )}
     </div>

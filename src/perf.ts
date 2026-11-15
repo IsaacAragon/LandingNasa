@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import type { Bi } from "./i18n";
 
 /* ==========================================================================
    Modo rendimiento
@@ -14,7 +15,7 @@ export interface PerfState {
   mode: PerfMode;        // elección del usuario
   lite: boolean;         // modo efectivo
   auto: boolean;         // el modo automático detectó un equipo lento
-  reasons: string[];     // por qué se activó automáticamente
+  reasons: Bi[];         // por qué se activó automáticamente (bilingüe)
 }
 
 const MODE_KEY = "aresmap-perf";
@@ -52,17 +53,18 @@ function gpuName(): string | null {
 /* GPU por software, Intel "HD Graphics" antiguas (no UHD/Iris), y GPU de móviles de gama baja */
 const WEAK_GPU = /swiftshader|llvmpipe|softpipe|software|basic render|intel[^,]*\bhd graphics\b|intel[^,]*\bgma\b|mali-[2-4]\d\b|mali-t\d|mali-g[3-5]\d\b|adreno \(tm\) ([2-5]\d\d|6[01]\d)\b|powervr/i;
 
-function detectHardware(): string[] {
+function detectHardware(): Bi[] {
   const n = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } };
-  const reasons: string[] = [];
+  const reasons: Bi[] = [];
   const mem = n.deviceMemory ?? 0, cores = n.hardwareConcurrency ?? 0;
-  if (mem && mem <= 2) reasons.push(`${mem} GB de RAM`);
-  else if (mem && mem <= 4 && cores && cores <= 4) reasons.push(`${mem} GB de RAM y ${cores} núcleos`);
-  else if (cores && cores <= 2) reasons.push(`${cores} núcleos de CPU`);
-  if (n.connection?.saveData) reasons.push("ahorro de datos activado");
+  if (mem && mem <= 2) reasons.push({ en: `${mem} GB RAM`, es: `${mem} GB de RAM` });
+  else if (mem && mem <= 4 && cores && cores <= 4) reasons.push({ en: `${mem} GB RAM and ${cores} cores`, es: `${mem} GB de RAM y ${cores} núcleos` });
+  else if (cores && cores <= 2) reasons.push({ en: `${cores} CPU cores`, es: `${cores} núcleos de CPU` });
+  if (n.connection?.saveData) reasons.push({ en: "data saver on", es: "ahorro de datos activado" });
   const gpu = gpuName();
-  if (gpu === null) reasons.push("sin WebGL");
-  else if (WEAK_GPU.test(gpu)) reasons.push(`gráficos básicos (${gpu.replace(/^ANGLE \(|\)$/g, "").split(",").slice(0, 2).join(",").trim()})`);
+  const gpuShort = gpu ? gpu.replace(/^ANGLE \(|\)$/g, "").split(",").slice(0, 2).join(",").trim() : "";
+  if (gpu === null) reasons.push({ en: "no WebGL", es: "sin WebGL" });
+  else if (WEAK_GPU.test(gpu)) reasons.push({ en: `basic graphics (${gpuShort})`, es: `gráficos básicos (${gpuShort})` });
   return reasons;
 }
 
@@ -72,8 +74,8 @@ export function initPerf() {
   const saved = read(MODE_KEY);
   const mode: PerfMode = saved === "on" || saved === "off" ? saved : "auto";
   const reasons = detectHardware();
-  const remembered = read(AUTO_KEY);               // una medición lenta de una visita anterior
-  if (remembered) reasons.push(remembered);
+  const remembered = read(AUTO_KEY);               // fps medidos en una visita anterior
+  if (remembered) reasons.push({ en: `${remembered} fps measured`, es: `${remembered} fps medidos` });
   commit({ mode, auto: reasons.length > 0, reasons });
 }
 
@@ -95,8 +97,9 @@ export function probeFrameRate() {
     const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
     const slow = sorted.filter((x) => x > 34).length / Math.max(sorted.length, 1);
     if (median > 24 || slow > 0.3) {
-      const why = `${Math.round(1000 / median)} fps medidos`;
-      write(AUTO_KEY, why);
+      const fps = String(Math.round(1000 / median));
+      const why = { en: `${fps} fps measured`, es: `${fps} fps medidos` };
+      write(AUTO_KEY, fps);
       commit({ ...state, auto: true, reasons: [...state.reasons, why] });
     }
     probing = false;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import marsVideo from "./assets/MarsVIdeo.webm";
+import { useT } from "./i18n";
 
 /* Segundo del video en el que empieza el zoom al planeta */
 const ZOOM_AT = 9;
@@ -30,6 +31,7 @@ const clamp01 = (u: number) => Math.min(Math.max(u, 0), 1);
  * del zoom continúa exactamente desde la de la deriva, sin saltos.
  */
 export default function Intro({ onReveal, onDone }: Props) {
+  const t = useT();
   const video = useRef<HTMLVideoElement>(null);
   const flash = useRef<HTMLDivElement>(null);
   const bar = useRef<HTMLElement>(null);
@@ -135,9 +137,9 @@ export default function Intro({ onReveal, onDone }: Props) {
       <div className="intro-layer intro-vignette" aria-hidden="true" />
       <div ref={flash} className="intro-layer intro-flash" aria-hidden="true" />
       <div ref={near} className="intro-layer intro-ui">
-        <span className="intro-coord" aria-hidden="true">Aproximación · 5.4°S 137.8°E · Gale</span>
+        <span className="intro-coord" aria-hidden="true">{t("Aproximación", "Approach")} · 5.4°S 137.8°E · Gale</span>
         <button className="intro-skip" onClick={skip}>
-          Entrar
+          {t("Entrar", "Enter")}
           <span className="intro-bar" aria-hidden="true"><i ref={bar} /></span>
         </button>
       </div>

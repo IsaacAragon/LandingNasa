@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { CRATER_ANGLE, GALE, MOUNT_SHARP } from "./mars";
 import { ROUTE_STOPS } from "./data";
 import { isLite, subscribePerf } from "./perf";
+import { useBi, useT, type Bi } from "./i18n";
 import { scrollTop } from "./scroll";
 
 /**
@@ -522,12 +523,14 @@ export default function Planet({ active, focusId, exitId }: Props) {
   }, [focusId, exitId]);
 
   const first = ROUTE_STOPS[0], goal = ROUTE_STOPS[ROUTE_STOPS.length - 1];
+  const t = useT(), bi = useBi();
+  const nm = (n: string | Bi) => (typeof n === "string" ? n : bi(n));
   return (
     <div className="planet-layer" aria-hidden="true">
       <canvas ref={canvas} className="planet" data-active={active} />
       <div ref={fallback} className="planet-fallback" hidden />
-      <div ref={labelA} className="pin pin-start"><small>Inicio</small><b>{first.name}</b></div>
-      <div ref={labelB} className="pin pin-goal"><small>Destino</small><b>{goal.name}</b></div>
+      <div ref={labelA} className="pin pin-start"><small>{t("Inicio", "Start")}</small><b>{nm(first.name)}</b></div>
+      <div ref={labelB} className="pin pin-goal"><small>{t("Destino", "Goal")}</small><b>{nm(goal.name)}</b></div>
       <div ref={labelM} className="pin pin-plain"><b>Mount Sharp</b></div>
       <svg className="leader" width="100%" height="100%"><path ref={leader} /></svg>
     </div>

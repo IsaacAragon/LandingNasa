@@ -1,4 +1,6 @@
 import { useState, type PointerEvent, type ReactNode } from "react";
+import { useLocale, useT, type Bi } from "./i18n";
+import { useBi } from "./i18n";
 
 /* ==========================================================================
    Gráficos de las capas de datos (skill dataviz):
@@ -26,12 +28,13 @@ function useTip() {
 }
 
 function DataTable({ caption, head, rows }: { caption: string; head: string[]; rows: (string | number)[][] }) {
+  const t = useT();
   return (
     <details className="chart-table">
-      <summary>Ver datos</summary>
+      <summary>{t("Ver datos", "View data")}</summary>
       <table>
         <caption>{caption}</caption>
-        <thead><tr>{head.map((h) => <th key={h} scope="col">{h}</th>)}</tr></thead>
+        <thead><tr>{head.map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
         <tbody>{rows.map((r) => <tr key={String(r[0])}>{r.map((c, i) => <td key={i}>{c}</td>)}</tr>)}</tbody>
       </table>
     </details>
@@ -39,36 +42,40 @@ function DataTable({ caption, head, rows }: { caption: string; head: string[]; r
 }
 
 export function ChartFrame({ title, sources, children }: { title: string; sources: string; children: ReactNode }) {
+  const t = useT();
   return (
     <figure className="chart-frame">
       <figcaption>{title}</figcaption>
       {children}
-      <p className="chart-src">Fuentes: {sources}</p>
+      <p className="chart-src">{t("Fuentes", "Sources")}: {sources}</p>
     </figure>
   );
 }
 
 /* ---------- Barras horizontales con énfasis ---------- */
-interface BarRow { label: string; value: number; emphasis?: boolean; note?: string }
+interface BarRow { label: Bi | string; value: number; emphasis?: boolean; note?: Bi }
 export function BarChart({ rows, unit, digits = 2, caption }: { rows: BarRow[]; unit: string; digits?: number; caption: string }) {
   const { bind, node } = useTip();
+  const bi = useBi();
+  const locale = useLocale();
+  const name = (l: Bi | string) => (typeof l === "string" ? l : bi(l));
   const max = Math.max(...rows.map((r) => r.value));
-  const fmt = (v: number) => v.toLocaleString("es", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  const fmt = (v: number) => v.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits });
   return (
     <>
       <div className="chart bars">
         {rows.map((r) => (
-          <div key={r.label} className="bar-row" {...bind(`${r.label}: ${fmt(r.value)} ${unit}`)}>
-            <span className="bar-label">{r.label}</span>
+          <div key={name(r.label)} className="bar-row" {...bind(`${name(r.label)}: ${fmt(r.value)} ${unit}`)}>
+            <span className="bar-label">{name(r.label)}</span>
             <span className="bar-track">
               <span className="bar" data-emphasis={!!r.emphasis} style={{ width: `${(r.value / max) * 100}%` }} />
             </span>
-            <span className="bar-value">{fmt(r.value)} <small>{unit}</small>{r.note && <em>{r.note}</em>}</span>
+            <span className="bar-value">{fmt(r.value)} <small>{unit}</small>{r.note && <em>{bi(r.note)}</em>}</span>
           </div>
         ))}
         {node}
       </div>
-      <DataTable caption={caption} head={["", unit]} rows={rows.map((r) => [r.label, fmt(r.value)])} />
+      <DataTable caption={caption} head={["", unit]} rows={rows.map((r) => [name(r.label), fmt(r.value)])} />
     </>
   );
 }
@@ -76,6 +83,7 @@ export function BarChart({ rows, unit, digits = 2, caption }: { rows: BarRow[]; 
 /* ---------- Metano: rango estacional, media ± σ y picos en escala logarítmica ---------- */
 export function MethaneChart({ m }: { m: { mean: number; sd: number; seasonalMin: number; seasonalMax: number; spike: number } }) {
   const { bind, node } = useTip();
+  const t = useT();
   const lo = Math.log10(0.1), hi = Math.log10(10);
   const x = (v: number) => `${((Math.log10(v) - lo) / (hi - lo)) * 100}%`;
   const ticks = [0.1, 0.3, 1, 3, 10];
@@ -83,54 +91,61 @@ export function MethaneChart({ m }: { m: { mean: number; sd: number; seasonalMin
     <>
       <div className="chart methane">
         <div className="m-plot">
-          {ticks.map((t) => <span key={t} className="m-grid" style={{ left: x(t) }} />)}
+          {ticks.map((k) => <span key={k} className="m-grid" style={{ left: x(k) }} />)}
           <span className="m-band" style={{ left: x(m.seasonalMin), width: `calc(${x(m.seasonalMax)} - ${x(m.seasonalMin)})` }}
-            {...bind(`Ciclo estacional: ${m.seasonalMin}–${m.seasonalMax} ppbv`)} />
+            {...bind(`${t("Ciclo estacional", "Seasonal cycle")}: ${m.seasonalMin}–${m.seasonalMax} ppbv`)} />
           <span className="m-err" style={{ left: x(m.mean - m.sd), width: `calc(${x(m.mean + m.sd)} - ${x(m.mean - m.sd)})` }} />
-          <span className="m-dot m-mean" style={{ left: x(m.mean) }} {...bind(`Fondo medio: ${m.mean} ± ${m.sd} ppbv`)} />
-          <span className="m-dot m-spike" style={{ left: x(m.spike) }} {...bind(`Picos: ~${m.spike} ppbv`)} />
-          <span className="m-lab" style={{ left: x(m.mean) }}>Fondo {m.mean} ± {m.sd}</span>
-          <span className="m-lab m-lab-up" style={{ left: x(Math.sqrt(m.seasonalMin * m.seasonalMax)) }}>Estaciones {m.seasonalMin}–{m.seasonalMax}</span>
-          <span className="m-lab" style={{ left: x(m.spike) }}>Picos ~{m.spike}</span>
+          <span className="m-dot m-mean" style={{ left: x(m.mean) }} {...bind(`${t("Fondo medio", "Mean background")}: ${m.mean} ± ${m.sd} ppbv`)} />
+          <span className="m-dot m-spike" style={{ left: x(m.spike) }} {...bind(`${t("Picos", "Spikes")}: ~${m.spike} ppbv`)} />
+          <span className="m-lab" style={{ left: x(m.mean) }}>{t("Fondo", "Background")} {m.mean} ± {m.sd}</span>
+          <span className="m-lab m-lab-up" style={{ left: x(Math.sqrt(m.seasonalMin * m.seasonalMax)) }}>{t("Estaciones", "Seasons")} {m.seasonalMin}–{m.seasonalMax}</span>
+          <span className="m-lab" style={{ left: x(m.spike) }}>{t("Picos", "Spikes")} ~{m.spike}</span>
         </div>
-        <div className="m-axis">{ticks.map((t) => <span key={t} style={{ left: x(t) }}>{t}</span>)}</div>
-        <p className="m-unit">ppbv · escala logarítmica</p>
+        <div className="m-axis">{ticks.map((k) => <span key={k} style={{ left: x(k) }}>{k}</span>)}</div>
+        <p className="m-unit">{t("ppbv · escala logarítmica", "ppbv · logarithmic scale")}</p>
         {node}
       </div>
-      <DataTable caption="Metano en Gale (ppbv)" head={["Medida", "ppbv"]} rows={[
-        ["Fondo medio", `${m.mean} ± ${m.sd}`], ["Ciclo estacional", `${m.seasonalMin}–${m.seasonalMax}`], ["Picos", `~${m.spike}`],
+      <DataTable caption={t("Metano en Gale (ppbv)", "Methane at Gale (ppbv)")} head={[t("Medida", "Measure"), "ppbv"]} rows={[
+        [t("Fondo medio", "Mean background"), `${m.mean} ± ${m.sd}`],
+        [t("Ciclo estacional", "Seasonal cycle"), `${m.seasonalMin}–${m.seasonalMax}`],
+        [t("Picos", "Spikes"), `~${m.spike}`],
       ]} />
     </>
   );
 }
 
 /* ---------- Columna estratigráfica (esquema: orden de capas, sin espesores) ---------- */
-export function StrataChart({ strata, km }: { strata: { name: string; note: string }[]; km: number }) {
+export function StrataChart({ strata, km }: { strata: { name: Bi; note: Bi }[]; km: number }) {
+  const t = useT();
+  const bi = useBi();
   return (
     <div className="chart strata">
-      <div className="s-axis"><span>~{km} km<br />más nuevas</span><span>0<br />más viejas</span></div>
+      <div className="s-axis"><span>~{km} km<br />{t("más nuevas", "newest")}</span><span>0<br />{t("más viejas", "oldest")}</span></div>
       <ol className="s-col">
         {[...strata].reverse().map((s, i) => (
-          <li key={s.name} data-emphasis={i === 0}>
-            <b>{s.name}</b><span>{s.note}</span>
+          <li key={s.name.en} data-emphasis={i === 0}>
+            <b>{bi(s.name)}</b><span>{bi(s.note)}</span>
           </li>
         ))}
       </ol>
-      <p className="m-unit">Esquema: orden de las capas al subir, no su espesor</p>
+      <p className="m-unit">{t("Esquema: orden de las capas al subir, no su espesor", "Schematic: order of the layers going up, not their thickness")}</p>
     </div>
   );
 }
 
 /* ---------- Elementos de la vida medidos en Yellowknife Bay ---------- */
-export function ElementsChart({ items }: { items: { symbol: string; name: string; status: string }[] }) {
-  const measured = items.filter((e) => e.status === "medido").length;
+export function ElementsChart({ items }: { items: { symbol: string; name: Bi; status: string }[] }) {
+  const t = useT();
+  const bi = useBi();
+  const measured = items.filter((e) => e.status === "measured").length;
   return (
     <div className="chart elements">
-      <p className="el-head"><b>{measured} de {items.length}</b> elementos clave medidos directamente</p>
+      <p className="el-head"><b>{measured} {t("de", "of")} {items.length}</b> {t("elementos clave medidos directamente", "key elements measured directly")}</p>
       <ul>
         {items.map((e) => (
           <li key={e.symbol} data-status={e.status}>
-            <b>{e.symbol}</b><span>{e.name}</span><small>{e.status === "medido" ? "✓ medido" : "◌ inferido"}</small>
+            <b>{e.symbol}</b><span>{bi(e.name)}</span>
+            <small>{e.status === "measured" ? t("✓ medido", "✓ measured") : t("◌ inferido", "◌ inferred")}</small>
           </li>
         ))}
       </ul>
@@ -139,11 +154,12 @@ export function ElementsChart({ items }: { items: { symbol: string; name: string
 }
 
 /* ---------- Línea de tiempo ---------- */
-export function Timeline({ items }: { items: { date: string; label: string; src: string }[] }) {
+export function Timeline({ items }: { items: { date: Bi; label: Bi; src: string }[] }) {
+  const bi = useBi();
   return (
     <ol className="chart timeline">
       {items.map((t) => (
-        <li key={t.date}><time>{t.date}</time><span>{t.label}</span><small>{t.src}</small></li>
+        <li key={t.date.en}><time>{bi(t.date)}</time><span>{bi(t.label)}</span><small>{t.src}</small></li>
       ))}
     </ol>
   );
