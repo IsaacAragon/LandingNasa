@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { CRATER_ANGLE, GALE, MOUNT_SHARP } from "./mars";
 import { ROUTE_STOPS } from "./data";
+import { scrollTop } from "./scroll";
 
 /**
  * Marte procedural en WebGL2: relieve, cráteres, casquete polar, halo de polvo
@@ -217,20 +218,20 @@ export default function Planet({ active, focusId, exitId }: Props) {
     const gl = cv.getContext("webgl2", { premultipliedAlpha: true, antialias: false, alpha: true });
     if (!gl) { cv.hidden = true; fallback.current!.hidden = false; return; }
 
+    // Compilación en paralelo: el driver compila en su hilo y aquí no se consulta nada
+    // (ni estado ni uniforms) hasta que avisa que terminó. Así la página no se congela al cargar.
+    const pcs = gl.getExtension("KHR_parallel_shader_compile");
     const sh = (type: number, src: string) => {
       const s = gl.createShader(type)!; gl.shaderSource(s, src); gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
       return s;
     };
     const vert = sh(gl.VERTEX_SHADER, VERT);
-    const program = (frag: string) => {
-      const pr = gl.createProgram()!;
-      gl.attachShader(pr, vert); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, frag)); gl.linkProgram(pr);
-      if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(pr));
-      const loc = (n: string) => gl.getUniformLocation(pr, n);
-      return { pr, loc };
+    const makeProgram = (frag: string) => {
+      const pr = gl.createProgram()!, fs = sh(gl.FRAGMENT_SHADER, frag);
+      gl.attachShader(pr, vert); gl.attachShader(pr, fs); gl.linkProgram(pr);
+      return { pr, fs };
     };
-    const T = program(TERRAIN_FRAG), O = program(OVERLAY_FRAG);
+    const T = makeProgram(TERRAIN_FRAG), O = makeProgram(OVERLAY_FRAG);
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
@@ -239,21 +240,36 @@ export default function Planet({ active, focusId, exitId }: Props) {
     gl.clearColor(0, 0, 0, 0);
 
     const G = unit(GALE.lat, GALE.lon);
-    for (const { pr, loc } of [T, O]) {
-      gl.useProgram(pr);
-      gl.uniform3f(loc("uGale"), ...G);
-      gl.uniform1f(loc("uC"), CRATER_ANGLE);
-    }
-    gl.useProgram(T.pr);
-    gl.uniform3f(T.loc("uMount"), MOUNT_SHARP.x, MOUNT_SHARP.y, MOUNT_SHARP.r);
-    gl.useProgram(O.pr);
-    gl.uniform2fv(O.loc("uStops"), new Float32Array(STOPS.flat()));
-    gl.uniform1i(O.loc("uTerrain"), 0);
-    const UT = { center: T.loc("uCenter"), radius: T.loc("uRadius"), lon: T.loc("uLon"), tilt: T.loc("uTilt"), detail: T.loc("uDetail") };
-    const UO = {
-      center: O.loc("uCenter"), radius: O.loc("uRadius"), lon: O.loc("uLon"), tilt: O.loc("uTilt"), time: O.loc("uTime"),
-      texScale: O.loc("uTexScale"), a: O.loc("uA"), b: O.loc("uB"), route: O.loc("uRoute"), rover: O.loc("uRover"),
-      roverPos: O.loc("uRoverPos"), dot: O.loc("uDot"),
+    const buildUniforms = () => {
+      for (const x of [T, O]) {
+        if (!gl.getProgramParameter(x.pr, gl.LINK_STATUS)) console.error(gl.getShaderInfoLog(x.fs) || gl.getProgramInfoLog(x.pr));
+      }
+      const lt = (n: string) => gl.getUniformLocation(T.pr, n), lo = (n: string) => gl.getUniformLocation(O.pr, n);
+      for (const [pr, loc] of [[T.pr, lt], [O.pr, lo]] as const) {
+        gl.useProgram(pr);
+        gl.uniform3f(loc("uGale"), ...G);
+        gl.uniform1f(loc("uC"), CRATER_ANGLE);
+      }
+      gl.useProgram(T.pr);
+      gl.uniform3f(lt("uMount"), MOUNT_SHARP.x, MOUNT_SHARP.y, MOUNT_SHARP.r);
+      gl.useProgram(O.pr);
+      gl.uniform2fv(lo("uStops"), new Float32Array(STOPS.flat()));
+      gl.uniform1i(lo("uTerrain"), 0);
+      return {
+        UT: { center: lt("uCenter"), radius: lt("uRadius"), lon: lt("uLon"), tilt: lt("uTilt"), detail: lt("uDetail") },
+        UO: {
+          center: lo("uCenter"), radius: lo("uRadius"), lon: lo("uLon"), tilt: lo("uTilt"), time: lo("uTime"),
+          texScale: lo("uTexScale"), a: lo("uA"), b: lo("uB"), route: lo("uRoute"), rover: lo("uRover"),
+          roverPos: lo("uRoverPos"), dot: lo("uDot"),
+        },
+      };
+    };
+    let uniforms: ReturnType<typeof buildUniforms> | null = null;
+    const ready = () => {
+      if (uniforms) return true;
+      if (pcs && !(gl.getProgramParameter(T.pr, pcs.COMPLETION_STATUS_KHR) && gl.getProgramParameter(O.pr, pcs.COMPLETION_STATUS_KHR))) return false;
+      uniforms = buildUniforms();
+      return true;
     };
 
     // Textura donde se guarda el terreno ya calculado
@@ -283,11 +299,20 @@ export default function Planet({ active, focusId, exitId }: Props) {
       const n: V3 = [q[0], ct * q[1] - st * q[2], st * q[1] + ct * q[2]];       // rotX(tilt)ᵀ
       return { x: cx + n[0] * R, y: cy - n[1] * R, visible: n[2] > 0.05 };
     };
+    // Solo se escribe en el DOM si el valor cambió (menos invalidaciones de estilo por frame)
+    const written = new Map<Element, string>();
     const place = (el: HTMLDivElement | null, pt: { x: number; y: number; visible: boolean }, alpha: number) => {
       if (!el) return;
       const on = pt.visible && alpha > 0.01;
-      el.style.opacity = on ? String(alpha) : "0";
+      const key = on ? `${alpha.toFixed(2)}|${pt.x.toFixed(1)}|${pt.y.toFixed(1)}` : "off";
+      if (written.get(el) === key) return;
+      written.set(el, key);
+      el.style.opacity = on ? alpha.toFixed(2) : "0";
       if (on) el.style.transform = `translate3d(${pt.x.toFixed(1)}px, ${pt.y.toFixed(1)}px, 0)`;
+    };
+    const setOpacity = (el: HTMLElement | SVGElement | null, v: string) => {
+      if (!el || written.get(el) === v) return;
+      written.set(el, v); el.style.opacity = v;
     };
 
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -308,34 +333,55 @@ export default function Planet({ active, focusId, exitId }: Props) {
     addEventListener("pointermove", move, { passive: true });
 
     const jl = GALE.lat * RAD, jo = GALE.lon * RAD;
-    let raf = 0, last = performance.now(), phase = 0, roverT = 0, step = -1;
+    let raf = 0, last = performance.now(), phase = 0, roverT = 0, step = -1, idle = false, running = false;
     const anchorSel = '[data-anchor="gale"]';
+    // Posiciones en el documento de la zona, la sección de salida y la tarjeta del hero.
+    // Se miden una vez (y al cambiar el tamaño o el contenido); cada frame solo usa scrollY.
+    const geo = { focus: null as HTMLElement | null, focusTop: 0, focusH: 1, exitTop: 1e9, card: null as HTMLElement | null, cardLeft: 0, cardBottom: 0, cardShown: false };
+    const measure = () => {
+      const y = scrollY;
+      geo.focus = document.getElementById(focusId);
+      const f = geo.focus?.getBoundingClientRect(), e = document.getElementById(exitId)?.getBoundingClientRect();
+      if (f) { geo.focusTop = f.top + y; geo.focusH = f.height; }
+      if (e) geo.exitTop = e.top + y;
+      geo.card = document.querySelector<HTMLElement>(anchorSel);
+      const r = geo.card?.getBoundingClientRect();
+      const ty = geo.card ? parseFloat(geo.card.style.translate.split(" ")[1] || "0") || 0 : 0;
+      geo.cardShown = !!r && r.width > 0;
+      if (r) { geo.cardLeft = r.left; geo.cardBottom = r.bottom + y - ty; }
+      wake();
+    };
+    const wake = () => { if (idle && running) { idle = false; last = performance.now(); raf = requestAnimationFrame(frame); } };
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const dt = Math.min((now - last) / 1000, 0.05); last = now;
 
-      const focus = document.getElementById(focusId), exit = document.getElementById(exitId);
-      const fr = focus?.getBoundingClientRect(), er = exit?.getBoundingClientRect();
+      if (!ready()) return;                         // el shader aún compila: no se dibuja ni se bloquea
+      const { UT, UO } = uniforms!;
+      const y = scrollTop();                        // leída una vez por evento de scroll: no fuerza layout
+      const focus = geo.focus, fTop = geo.focusTop - y, eTop = geo.exitTop - y;
       // a: llegada a la zona (gira hasta Gale). p: avance dentro de la zona fijada.
-      const a = fr ? smooth(clamp01(1 - fr.top / H)) : 0;
-      const p = fr ? clamp01(-fr.top / Math.max(fr.height - H, 1)) : 0;
-      const b = er ? smooth(clamp01(1 - (er.top - H * 0.2) / (H * 0.8))) : 0;
+      const a = smooth(clamp01(1 - fTop / H));
+      const p = clamp01(-fTop / Math.max(geo.focusH - H, 1));
+      const b = smooth(clamp01(1 - (eTop - H * 0.2) / (H * 0.8)));
 
       // Fase visible en la tarjeta de pasos (0 zoom, 1 inicio, 2 destino, 3 ruta)
       const s = p < 0.3 ? 0 : p < 0.45 ? 1 : p < 0.58 ? 2 : 3;
       if (focus && s !== step) { step = s; focus.dataset.step = String(s); }
 
       if (b >= 1) {
-        cv.style.opacity = "0";
-        [labelA.current, labelB.current, labelM.current].forEach((el) => el && (el.style.opacity = "0"));
-        if (leader.current) leader.current.style.opacity = "0";
+        setOpacity(cv, "0");
+        [labelA.current, labelB.current, labelM.current, leader.current].forEach((el) => setOpacity(el, "0"));
+        written.delete(labelA.current!); written.delete(labelB.current!); written.delete(labelM.current!);
+        cancelAnimationFrame(raf); idle = true;      // el planeta salió: sin trabajo hasta volver a hacer scroll
         return;
       }
-      cv.style.opacity = String(1 - b);
+      setOpacity(cv, (1 - b).toFixed(3));
 
       // En el hero gira despacio de un lado a otro sin perder de vista Gale; al llegar a la zona queda de frente
       if (!reduced) phase += dt * ((Math.PI * 2) / 48) * (1 - a);
-      const lon = jo + 0.8 * Math.sin(phase) * (1 - a);
+      const lonRaw = jo + 0.8 * Math.sin(phase) * (1 - a);
+      const lon = a < 1 ? Math.round(lonRaw / 0.0025) * 0.0025 : lonRaw;
       const tilt = lerp(0.12, jl, a);
 
       cur.x += (ptr.x - cur.x) * 0.05; cur.y += (ptr.y - cur.y) * 0.05;
@@ -427,22 +473,26 @@ export default function Planet({ active, focusId, exitId }: Props) {
       // Línea que une la tarjeta "Cráter Gale" del hero con el punto rojo
       const line = leader.current;
       if (line) {
-        const card = document.querySelector<HTMLElement>(anchorSel);
+        const card = geo.card;
         const show = (1 - smooth(clamp01(a * 2))) * dotOn;
         const g = project(0, 0, lon, tilt, cx, cy, radius);
-        const r = card?.getBoundingClientRect();
-        if (r && r.width > 0 && show > 0.01 && g.visible) {     // en móvil la tarjeta está oculta: sin línea
-          const sx = r.left + 34, sy = r.bottom;                      // sale del icono, por debajo de la tarjeta
-          line.style.opacity = String(show);
-          line.setAttribute("d", `M${sx.toFixed(1)} ${sy.toFixed(1)} L${sx.toFixed(1)} ${(sy + 16).toFixed(1)} L${g.x.toFixed(1)} ${g.y.toFixed(1)}`);
-        } else line.style.opacity = "0";
+        if (card && geo.cardShown && show > 0.01 && g.visible) {   // en móvil la tarjeta está oculta: sin línea
+          const ty = parseFloat(card.style.translate.split(" ")[1] || "0") || 0;   // paralaje actual (estilo en línea, sin layout)
+          const sx = geo.cardLeft + 34, sy = geo.cardBottom - y + ty;           // sale del icono, por debajo de la tarjeta
+          setOpacity(line, show.toFixed(2));
+          const d = `M${sx.toFixed(1)} ${sy.toFixed(1)} L${sx.toFixed(1)} ${(sy + 16).toFixed(1)} L${g.x.toFixed(1)} ${g.y.toFixed(1)}`;
+          if (written.get(card) !== d) { written.set(card, d); line.setAttribute("d", d); }
+        } else setOpacity(line, "0");
       }
     };
 
-    let running = false;
+    measure();
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(document.body);
+    addEventListener("scroll", wake, { passive: true });
     const startStop = () => {
       const want = cv.dataset.active === "true" && document.visibilityState === "visible";
-      if (want && !running) { running = true; last = performance.now(); raf = requestAnimationFrame(frame); }
+      if (want && !running) { running = true; idle = false; last = performance.now(); raf = requestAnimationFrame(frame); }
       if (!want && running) { running = false; cancelAnimationFrame(raf); }
     };
     const obs = new MutationObserver(startStop);
@@ -453,6 +503,8 @@ export default function Planet({ active, focusId, exitId }: Props) {
     return () => {
       cancelAnimationFrame(raf);
       obs.disconnect();
+      ro.disconnect();
+      removeEventListener("scroll", wake);
       document.removeEventListener("visibilitychange", startStop);
       removeEventListener("resize", resize);
       removeEventListener("pointermove", move);

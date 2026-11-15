@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap");
+/* La fuente IBM Plex Mono se carga desde index.html sin bloquear el render */
 
 /* ==========================================================================
    Aresmap: sistema de diseño
@@ -27,7 +27,7 @@
   --white-a14: rgba(255, 255, 255, 0.14);
   --white-a22: rgba(255, 255, 255, 0.22);
   --white-a30: rgba(255, 255, 255, 0.3);
-  --glass-a72: rgba(18, 16, 16, 0.72);
+  --glass-a72: rgba(16, 14, 14, 0.9);
 
   --font-system: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -79,7 +79,7 @@
   --btn-primary-bg: #000;
   --btn-primary-border: var(--white-a30);
   --btn-glass-bg: var(--white-a07);
-  --card-bg: rgba(20, 18, 18, 0.62);
+  --card-bg: rgba(19, 17, 17, 0.92);   /* sólido: sin backdrop-filter (cada blur se recalculaba al mover el fondo) */
   --card-pad: var(--space-8);
   --card-radius: var(--radius-xl);
   --nav-bg: rgba(16, 14, 14, 0.78);
@@ -103,7 +103,13 @@ a { color: inherit; }
 .site { position: relative; z-index: 2; }
 
 /* Capas de fondo del parallax: estrellas (lejos) → planeta (medio) → grano */
-.stars { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; }
+.stars { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.stars canvas { position: absolute; left: 0; top: 0; width: 100%; height: 200%; will-change: transform; }
+/* Parpadeo: cada capa cambia de opacidad a su ritmo (lo compone la GPU, sin redibujar) */
+.stars[data-on="true"] canvas { animation: twinkle 6s ease-in-out infinite alternate; }
+.stars[data-on="true"] canvas:nth-child(2) { animation-duration: 8.5s; animation-delay: -3s; }
+.stars[data-on="true"] canvas:nth-child(3) { animation-duration: 4.5s; animation-delay: -1.5s; }
+@keyframes twinkle { from { opacity: 1; } to { opacity: 0.45; } }
 .planet-layer { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
 .planet { width: 100%; height: 100%; display: block; transform-origin: 71% 52%; }
 .planet-fallback {
@@ -135,7 +141,6 @@ a { color: inherit; }
   padding: 0.35rem 0.85rem; border-radius: var(--radius-pill);
   background: var(--white-a07); border: 1px solid var(--border-strong);
   color: var(--platinum-300); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
 }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-planet); box-shadow: 0 0 10px var(--accent-planet); animation: pulse 2.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: 0.45; transform: scale(0.8); } }
@@ -153,8 +158,7 @@ a { color: inherit; }
   box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 .btn-glass {
-  background: var(--btn-glass-bg); color: var(--text); border: 1px solid var(--white-a14);
-  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: var(--highlight);
+  background: var(--btn-glass-bg); color: var(--text); border: 1px solid var(--white-a14); box-shadow: var(--highlight);
 }
 .btn-sm { min-height: 40px; padding: 0.4rem 1.1rem; font-size: 0.85rem; }
 @media (hover: hover) and (pointer: fine) {
@@ -166,7 +170,6 @@ a { color: inherit; }
 .card {
   position: relative; padding: var(--card-pad); border-radius: var(--card-radius);
   background: var(--card-bg); border: 1px solid var(--border);
-  backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
   box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.12);
 }
 .card-label { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.06em; color: var(--text-muted); }
@@ -256,7 +259,6 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
   position: absolute; display: flex; align-items: center; gap: var(--space-4);
   padding: var(--space-4) 1.3rem; border-radius: var(--radius-lg);
   background: var(--surface-glass); border: 1px solid var(--white-a14);
-  backdrop-filter: blur(24px) saturate(190%); -webkit-backdrop-filter: blur(24px) saturate(190%);
   box-shadow: var(--shadow-float), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 .hud-card:nth-child(1) { left: 2%; top: 6%; }
@@ -304,8 +306,7 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
 .pin {
   position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; will-change: transform, opacity;
   padding: 0.45rem 0.75rem; border-radius: 12px; white-space: nowrap;
-  background: var(--surface-glass); border: 1px solid var(--white-a14);
-  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: var(--shadow-float);
+  background: var(--surface-glass); border: 1px solid var(--white-a14); box-shadow: var(--shadow-float);
   translate: -50% calc(-100% - 22px);
 }
 .pin small { display: block; font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
@@ -367,8 +368,7 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
 .htimeline span { font-size: 0.88rem; color: var(--text-muted); }
 .facts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); width: 100%; margin-top: var(--space-2); }
 .fact {
-  padding: 1.1rem 1.2rem; border-radius: 20px; background: var(--card-bg); border: 1px solid var(--border);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: var(--highlight);
+  padding: 1.1rem 1.2rem; border-radius: 20px; background: var(--card-bg); border: 1px solid var(--border); box-shadow: var(--highlight);
 }
 .fact dt { font-size: clamp(1.2rem, 2vw, 1.6rem); font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .fact dd { margin-top: 0.15rem; font-size: 0.85rem; color: var(--text-muted); }
@@ -455,15 +455,11 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
 .planet[data-active="true"] { animation: arrive 1.6s var(--ease-spring) both; }
 [data-speed] { will-change: translate; }
 
-/* Revelado al hacer scroll (CSS nativo; sin soporte, todo queda visible) */
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .card, .fact, .section-head {
-      animation: reveal linear both; animation-timeline: view(); animation-range: entry 0% entry 55%;
-    }
-    @keyframes reveal { from { opacity: 0; transform: translateY(32px) scale(0.97); } }
-  }
-}
+/* Revelado al entrar en pantalla: lo activa un IntersectionObserver UNA vez por elemento
+   (antes era animation-timeline: view(), que Chrome recalculaba en cada evento de scroll).
+   El HTML prerenderizado no lleva el atributo: sin JavaScript todo queda visible. */
+[data-reveal="pending"] { opacity: 0; transform: translateY(28px) scale(0.98); }
+[data-reveal="in"] { transition: opacity 700ms var(--ease-out), transform 800ms var(--ease-spring); }
 
 /* ==========================================================================
    Móvil

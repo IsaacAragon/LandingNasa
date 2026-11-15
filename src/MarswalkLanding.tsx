@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Intro from "./Intro";
 import Planet from "./Planet";
+import { scrollTop, viewportHeight } from "./scroll";
 import Navbar from "./Navbar";
 import GaleTopography from "./GaleTopography";
 import { GALE, MOUNT_SHARP } from "./mars";
@@ -100,38 +101,56 @@ const LAYERS: DataLayer[] = [
 ];
 
 /* ---------- Campo de estrellas (capa más lejana del parallax) ---------- */
+/* Tres capas de estrellas (lejos → cerca). Cada una se dibuja UNA vez en un canvas del doble
+   de alto (el cielo repetido) y al hacer scroll solo se desplaza con transform: lo mueve la GPU
+   sin redibujar. El parpadeo es una animación CSS de opacidad por capa. */
+const STAR_LAYERS = [
+  { speed: 0.03, density: 1 / 9000, rMin: 0.25, rMax: 0.7, alpha: 0.55 },
+  { speed: 0.08, density: 1 / 16000, rMin: 0.5, rMax: 1.1, alpha: 0.75 },
+  { speed: 0.15, density: 1 / 40000, rMin: 0.9, rMax: 1.8, alpha: 0.95 },
+];
 function Starfield({ active }: { active: boolean }) {
-  const ref = useRef<HTMLCanvasElement>(null);
+  const refs = useRef<(HTMLCanvasElement | null)[]>([]);
   useEffect(() => {
-    const canvas = ref.current!;
-    const ctx = canvas.getContext("2d")!;
-    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let raf = 0;
-    let stars: { x: number; y: number; r: number; p: number; s: number }[] = [];
-    const resize = () => {
-      const dpr = Math.min(devicePixelRatio, 2);
-      canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      stars = Array.from({ length: Math.round((innerWidth * innerHeight) / 4500) }, () => ({
-        x: Math.random() * innerWidth, y: Math.random() * innerHeight,
-        r: Math.random() ** 3 * 1.6 + 0.2, p: Math.random() * 6.28, s: Math.random() * 0.8 + 0.2,
-      }));
+    let raf = 0, H = 0;
+    const paint = () => {
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      const W = innerWidth; H = innerHeight;
+      STAR_LAYERS.forEach((L, i) => {
+        const c = refs.current[i]; if (!c) return;
+        c.width = Math.round(W * dpr); c.height = Math.round(H * 2 * dpr);
+        const ctx = c.getContext("2d")!;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = `rgba(245,242,236,${L.alpha})`;
+        ctx.beginPath();
+        const n = Math.round(W * H * L.density);
+        for (let k = 0; k < n; k++) {
+          const x = Math.random() * W, y = Math.random() * H;
+          const r = L.rMin + Math.random() ** 2 * (L.rMax - L.rMin);
+          for (const yy of [y, y + H]) { ctx.moveTo(x + r, yy); ctx.arc(x, yy, r, 0, 6.2832); }   // repetido para el bucle
+        }
+        ctx.fill();
+      });
+      move();
     };
-    const draw = (t: number) => {
-      ctx.clearRect(0, 0, innerWidth, innerHeight);
-      for (const s of stars) {
-        const a = still ? 0.6 : 0.3 + 0.6 * Math.abs(Math.sin(t / 1400 * s.s + s.p));
-        ctx.fillStyle = `rgba(245,242,236,${a})`;
-        const y = (((s.y - (scrollY * s.r) / 10) % innerHeight) + innerHeight) % innerHeight;
-        ctx.beginPath(); ctx.arc(s.x, y, s.r, 0, 6.28); ctx.fill();
-      }
-      if (!still && active) raf = requestAnimationFrame(draw);
+    const move = () => {
+      raf = 0;
+      STAR_LAYERS.forEach((L, i) => {
+        const c = refs.current[i];
+        if (c) c.style.transform = `translate3d(0, ${(-((scrollTop() * L.speed) % H)).toFixed(1)}px, 0)`;
+      });
     };
-    resize(); draw(0);
-    addEventListener("resize", resize);
-    return () => { cancelAnimationFrame(raf); removeEventListener("resize", resize); };
-  }, [active]);
-  return <canvas ref={ref} className="stars" aria-hidden="true" />;
+    const queue = () => { if (!raf) raf = requestAnimationFrame(move); };
+    paint();
+    addEventListener("scroll", queue, { passive: true });
+    addEventListener("resize", paint);
+    return () => { cancelAnimationFrame(raf); removeEventListener("scroll", queue); removeEventListener("resize", paint); };
+  }, []);
+  return (
+    <div className="stars" data-on={active} aria-hidden="true">
+      {STAR_LAYERS.map((_, i) => <canvas key={i} ref={(el) => { refs.current[i] = el; }} />)}
+    </div>
+  );
 }
 
 /* ---------- Parallax por scroll ----------
@@ -141,40 +160,68 @@ function useScrollParallax(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     const els = Array.from(document.querySelectorAll<HTMLElement>("[data-speed]"));
-    const applied = new Map<HTMLElement, number>();
+    const items = els.map((el) => ({ el, speed: Number(el.dataset.speed), clamp: Number(el.dataset.clamp) || 0, top: 0, h: 0, applied: 0 }));
     let raf = 0;
-    const speed = new Map(els.map((el) => [el, Number(el.dataset.speed)]));
+    // Mide una sola vez la posición de cada elemento en el documento (sin su desplazamiento actual)
+    const measure = () => {
+      for (const it of items) {
+        const r = it.el.getBoundingClientRect();
+        it.top = r.top + scrollY - it.applied; it.h = r.height;
+      }
+      update();
+    };
+    // En cada scroll solo se usa la posición ya leída: no hay lecturas de layout, solo escrituras
     const update = () => {
       raf = 0;
-      const mid = innerHeight / 2, vh = innerHeight;
-      // Primero se leen todas las posiciones y después se escribe: sin recalcular el layout por elemento
-      const next: [HTMLElement, number][] = [];
-      for (const el of els) {
-        const r = el.getBoundingClientRect();
-        const prev = applied.get(el) ?? 0;
-        const top = r.top - prev;
-        if (top > vh * 1.5 || top + r.height < -vh * 0.5) continue;   // lejos de pantalla: no se toca
-        let offset = (top + r.height / 2 - mid) * -speed.get(el)!;
-        // data-clamp: tope relativo al alto (imágenes dentro de un marco con margen de escala)
-        const k = Number(el.dataset.clamp);
-        if (k) offset = Math.max(-r.height * k, Math.min(r.height * k, offset));
-        next.push([el, offset]);
-      }
-      for (const [el, offset] of next) {
-        if (Math.abs((applied.get(el) ?? 0) - offset) < 0.1) continue;
-        applied.set(el, offset);
-        el.style.translate = `0 ${offset.toFixed(1)}px`;
+      const vh = viewportHeight(), mid = vh / 2, y = scrollTop();
+      for (const it of items) {
+        const top = it.top - y;
+        if (top > vh * 1.5 || top + it.h < -vh * 0.5) continue;    // lejos de pantalla: no se toca
+        let offset = (top + it.h / 2 - mid) * -it.speed;
+        if (it.clamp) offset = Math.max(-it.h * it.clamp, Math.min(it.h * it.clamp, offset));
+        if (Math.abs(it.applied - offset) < 0.1) continue;
+        it.applied = offset;
+        it.el.style.translate = `0 ${offset.toFixed(1)}px`;
       }
     };
     const queue = () => { if (!raf) raf = requestAnimationFrame(update); };
-    update();
+    measure();
+    const ro = new ResizeObserver(() => measure());             // imágenes que cargan, cambios de ancho
+    ro.observe(document.body);
     addEventListener("scroll", queue, { passive: true });
-    addEventListener("resize", queue);
     return () => {
       cancelAnimationFrame(raf);
+      ro.disconnect();
       removeEventListener("scroll", queue);
-      removeEventListener("resize", queue);
       els.forEach((el) => (el.style.translate = ""));
+    };
+  }, [enabled]);
+}
+
+/* ---------- Revelado de tarjetas al entrar en pantalla ----------
+   Un IntersectionObserver marca cada tarjeta una sola vez; después no cuesta nada durante el scroll.
+   Las que ya están en pantalla al activarse no se ocultan. */
+function useReveal(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+    const els = Array.from(document.querySelectorAll<HTMLElement>(".card, .fact, .section-head")).filter((el) => !el.closest(".hero, .zone"));
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        const el = e.target as HTMLElement;
+        el.dataset.reveal = "in";
+        io.unobserve(el);
+      }
+    }, { rootMargin: "0px 0px -8% 0px" });
+    const vh = viewportHeight();
+    for (const el of els) {
+      if (el.getBoundingClientRect().top < vh) continue;
+      el.dataset.reveal = "pending";
+      io.observe(el);
+    }
+    return () => {
+      io.disconnect();
+      els.forEach((el) => delete el.dataset.reveal);
     };
   }, [enabled]);
 }
@@ -251,6 +298,7 @@ export default function MarswalkLanding() {
   const reveal = useCallback(() => setRevealed(true), []);
   const finish = useCallback(() => setIntroDone(true), []);
   useScrollParallax(revealed && !reduced);
+  useReveal(revealed && !reduced);
 
   return (
     <>

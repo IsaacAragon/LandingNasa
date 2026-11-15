@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Logo from "./Logo";
+import { scrollTop, viewportHeight } from "./scroll";
 
 interface Link { id: string; label: string }
 
@@ -24,23 +25,30 @@ export default function Navbar({ project, links, ctaHref }: { project: string; l
     return () => io.disconnect();
   }, [links]);
 
-  // Fondo al bajar y progreso de lectura (solo transform, una vez por frame)
+  // Fondo al bajar y progreso de lectura. Las medidas (alto de la página y posición de la primera
+  // sección) se toman solo al cambiar el tamaño; en cada scroll se usa scrollY, sin medir el layout.
   useEffect(() => {
-    let raf = 0;
+    let raf = 0, max = 1, firstTop = 0;
+    const measure = () => {
+      max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
+      const first = document.getElementById(firstId);
+      firstTop = first ? first.getBoundingClientRect().top + scrollY : 0;
+      update();
+    };
     const update = () => {
       raf = 0;
-      const max = document.documentElement.scrollHeight - innerHeight;
-      bar.current?.style.setProperty("transform", `scaleX(${max > 0 ? scrollY / max : 0})`);
-      setScrolled(scrollY > 24);
+      const y = scrollTop();
+      bar.current?.style.setProperty("transform", `scaleX(${Math.min(1, y / max)})`);
+      setScrolled(y > 24);
       // Antes de la primera sección (hero) no hay ninguna activa
-      const first = document.getElementById(firstId);
-      if (first && first.getBoundingClientRect().top > innerHeight / 2) setActive(null);
+      if (firstTop - y > viewportHeight() / 2) setActive(null);
     };
     const queue = () => { if (!raf) raf = requestAnimationFrame(update); };
-    update();
+    measure();
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(document.body);
     addEventListener("scroll", queue, { passive: true });
-    addEventListener("resize", queue);
-    return () => { cancelAnimationFrame(raf); removeEventListener("scroll", queue); removeEventListener("resize", queue); };
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); removeEventListener("scroll", queue); };
   }, [firstId]);
 
   return (
