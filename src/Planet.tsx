@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { CRATER_ANGLE, GALE, MOUNT_SHARP } from "./mars";
 import { ROUTE_STOPS } from "./data";
+import { isLite, subscribePerf } from "./perf";
 import { scrollTop } from "./scroll";
 
 /**
@@ -318,7 +319,8 @@ export default function Planet({ active, focusId, exitId }: Props) {
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     let dpr = 1, W = 0, H = 0;
     const resize = () => {
-      dpr = Math.min(devicePixelRatio || 1, 1.25);    // el shader es caro: 1.25 basta para un planeta suave
+      // El shader es caro: 1.25 basta para un planeta suave; en modo rendimiento, 0.75
+      dpr = isLite() ? 0.75 : Math.min(devicePixelRatio || 1, 1.25);
       W = innerWidth; H = innerHeight;
       cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
       allocTerrain();
@@ -327,13 +329,14 @@ export default function Planet({ active, focusId, exitId }: Props) {
     let terrainKey = "", terrainScale = 1, stillFrames = 0;
     resize();
     addEventListener("resize", resize);
+    const offPerf = subscribePerf(() => { resize(); wake(); });   // al cambiar de modo se ajusta la resolución
 
     const ptr = { x: 0, y: 0 }, cur = { x: 0, y: 0 };
     const move = (e: PointerEvent) => { ptr.x = e.clientX / W - 0.5; ptr.y = e.clientY / H - 0.5; };
     addEventListener("pointermove", move, { passive: true });
 
     const jl = GALE.lat * RAD, jo = GALE.lon * RAD;
-    let raf = 0, last = performance.now(), phase = 0, roverT = 0, step = -1, idle = false, running = false;
+    let raf = 0, last = performance.now(), phase = 0, roverT = 0, step = -1, idle = false, running = false, frameNo = 0;
     const anchorSel = '[data-anchor="gale"]';
     // Posiciones en el documento de la zona, la sección de salida y la tarjeta del hero.
     // Se miden una vez (y al cambiar el tamaño o el contenido); cada frame solo usa scrollY.
@@ -379,7 +382,9 @@ export default function Planet({ active, focusId, exitId }: Props) {
       setOpacity(cv, (1 - b).toFixed(3));
 
       // En el hero gira despacio de un lado a otro sin perder de vista Gale; al llegar a la zona queda de frente
-      if (!reduced) phase += dt * ((Math.PI * 2) / 48) * (1 - a);
+      const lite = isLite();
+      // En modo rendimiento el hero queda quieto: el terreno se dibuja una vez y no se recalcula
+      if (!reduced && !lite) phase += dt * ((Math.PI * 2) / 48) * (1 - a);
       const lonRaw = jo + 0.8 * Math.sin(phase) * (1 - a);
       const lon = a < 1 ? Math.round(lonRaw / 0.0025) * 0.0025 : lonRaw;
       const tilt = lerp(0.12, jl, a);
@@ -395,7 +400,7 @@ export default function Planet({ active, focusId, exitId }: Props) {
       const x1 = narrow ? W * 0.5 : W * 0.7, y1 = narrow ? H * 0.3 : H * 0.5;
       const z = smooth(clamp01(p / 0.3));
       const radius = lerp(r0, r1, a) * Math.pow(r2 / r1, z);       // zoom logarítmico: se siente uniforme
-      const par = 1 - z;                                           // sin paralaje de puntero de cerca: la cámara queda quieta
+      const par = lite ? 0 : 1 - z;                                // sin paralaje de puntero de cerca (ni en modo rendimiento)
       // De cerca, la cámara se centra en la ruta (noroeste del cráter), no en el centro de Gale
       const focusX = narrow ? W * 0.5 : W * 0.7, focusY = narrow ? H * 0.26 : H * 0.5;
       const shiftX = (focusX - x1 + ROUTE_CENTER[0] * -craterPx) * z;
@@ -412,7 +417,7 @@ export default function Planet({ active, focusId, exitId }: Props) {
       const rp = roverOn > 0 ? along(reduced ? 1 : roverT) : STOPS[0];
 
       const R = Math.min(radius * 1.35, Math.hypot(W, H) * 2) * dpr;
-      const detail = smooth(clamp01((radius * CRATER_ANGLE * dpr - 140) / 260));
+      const detail = lite ? 0 : smooth(clamp01((radius * CRATER_ANGLE * dpr - 140) / 260));
       const dotOn = 1 - smooth(clamp01((p - 0.22) / 0.1));
 
       // PASADA 1: el terreno solo se recalcula si la cámara se movió (medio píxel o un ángulo mínimo).
@@ -423,7 +428,7 @@ export default function Planet({ active, focusId, exitId }: Props) {
       stillFrames = moved ? 0 : stillFrames + 1;
       const big = radius * dpr > Math.max(cv.width, cv.height) * 0.6;
       if (moved || (terrainScale < 1 && stillFrames > 4)) {
-        terrainScale = moved && big ? 0.5 : 1;
+        terrainScale = moved && (big || lite) ? 0.5 : 1;
         terrainKey = key;
         const k = terrainScale;
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -440,6 +445,10 @@ export default function Planet({ active, focusId, exitId }: Props) {
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       }
+
+      // Modo rendimiento: si el terreno no cambió, la superposición se redibuja a 30 fps en vez de 60
+      frameNo++;
+      if (lite && !moved && frameNo % 2) return;
 
       // PASADA 2: copia del terreno + ruta, puntos, rover y punto rojo (cada frame, barata)
       const bx = Math.max(0, Math.floor(cx * dpr - R)), by = Math.max(0, Math.floor((H - cy) * dpr - R));
@@ -507,6 +516,7 @@ export default function Planet({ active, focusId, exitId }: Props) {
       removeEventListener("scroll", wake);
       document.removeEventListener("visibilitychange", startStop);
       removeEventListener("resize", resize);
+      offPerf();
       removeEventListener("pointermove", move);
     };
   }, [focusId, exitId]);

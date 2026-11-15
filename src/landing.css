@@ -226,6 +226,29 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
 .topbar ol a[aria-current] { color: var(--text); }
 .topbar ol a[aria-current]::after { transform: scaleX(1); }
 .topbar ol a[aria-current] span { color: var(--rust-300); }
+/* Botón de modo rendimiento */
+.topbar-actions { display: flex; align-items: center; gap: var(--space-6); }
+.perf { position: relative; }
+.perf-toggle {
+  display: inline-flex; align-items: center; gap: 0.45rem; min-height: 44px; padding: 0 0.2rem;
+  background: none; border: 0; cursor: pointer; color: var(--text-muted);
+  font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.perf-toggle:hover { color: var(--text); }
+.perf-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--text-subtle); transition: background-color var(--dur-ui) ease, border-color var(--dur-ui) ease; }
+.perf-toggle[aria-pressed="true"] { color: var(--text); }
+.perf-toggle[aria-pressed="true"] .perf-dot { background: var(--rust-300); border-color: var(--rust-300); }
+.perf-state { padding: 0.05rem 0.4rem; border: 1px solid var(--border-strong); border-radius: 4px; font-size: 0.62rem; color: var(--text-muted); }
+.perf-notice {
+  position: absolute; right: 0; top: calc(100% + 10px); width: min(320px, 86vw); padding: 0.8rem 0.9rem;
+  border-radius: 12px; background: var(--obsidian-950); border: 1px solid var(--border-strong); box-shadow: var(--shadow-float);
+  font-size: 0.82rem; line-height: 1.5; color: var(--text-muted); animation: rise 320ms var(--ease-out) both;
+}
+.perf-notice button {
+  display: block; margin-top: 0.5rem; padding: 0; background: none; border: 0; cursor: pointer;
+  color: var(--rust-300); font: inherit; font-size: 0.8rem; text-decoration: underline; text-underline-offset: 3px;
+}
+
 .topbar-cta {
   display: inline-flex; align-items: center; gap: 0.35rem; min-height: 44px;
   font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase;
@@ -465,7 +488,8 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
    Móvil
    ========================================================================== */
 @media (max-width: 860px) {
-  .topbar nav, .brand-meta { display: none; }
+  .topbar nav, .brand-meta, .perf-label { display: none; }
+  .topbar-actions { gap: var(--space-4); }
   .topbar-inner { grid-template-columns: 1fr auto; gap: var(--space-4); }
   /* Zona: en móvil solo se ve el paso activo, así el texto no choca con la ruta */
   .zone-steps { padding: var(--space-2); }
@@ -504,3 +528,15 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   html { scroll-behavior: auto; }
 }
+
+/* ==========================================================================
+   Modo rendimiento (html[data-perf="lite"]): fuera todo lo que trabaja en cada frame
+   o al hacer scroll y no aporta información. El contenido no cambia.
+   ========================================================================== */
+[data-perf="lite"] .grain { display: none; }
+[data-perf="lite"] .stars canvas:not(:first-child) { display: none; }   /* una capa de estrellas */
+[data-perf="lite"] .stars canvas { animation: none !important; will-change: auto; }
+[data-perf="lite"] [data-speed] { will-change: auto; }
+[data-perf="lite"] :is(.dot, .scroll-cue span, .logo-target, .topo-pin i, .topo-pin i::after, .route-map .route-line) { animation: none !important; }
+[data-perf="lite"] :is(.shot img, .topo-map-frame img, .bar) { transition: none !important; }
+[data-perf="lite"] .shot:hover img { scale: 1.14; }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Logo from "./Logo";
 import { scrollTop, viewportHeight } from "./scroll";
+import { getPerf, setPerfMode, subscribePerf, usePerf } from "./perf";
 
 interface Link { id: string; label: string }
 
@@ -70,9 +71,61 @@ export default function Navbar({ project, links, ctaHref }: { project: string; l
             ))}
           </ol>
         </nav>
-        <a className="topbar-cta" href={ctaHref}>Ver demo <span aria-hidden="true">↗</span></a>
+        <div className="topbar-actions">
+          <PerfToggle />
+          <a className="topbar-cta" href={ctaHref}>Ver demo <span aria-hidden="true">↗</span></a>
+        </div>
       </div>
       <i className="topbar-progress" ref={bar} aria-hidden="true" />
     </header>
+  );
+}
+
+/* ---------- Botón de modo rendimiento ----------
+   Activado: menos efectos (planeta estático en el hero, sin paralaje ni animaciones de entrada).
+   Si se activó solo, el título explica por qué; si se activó al medir los fps, avisa una vez. */
+function PerfToggle() {
+  const perf = usePerf();
+  const [notice, setNotice] = useState(false);
+
+  // Aviso cuando la medición de fps lo activa mientras se navega (no al cargar por hardware)
+  useEffect(() => {
+    let wasAuto = getPerf().auto, timer = 0;
+    const off = subscribePerf(() => {
+      const p = getPerf();
+      if (p.auto && !wasAuto && p.mode === "auto") {
+        setNotice(true);
+        clearTimeout(timer);
+        timer = window.setTimeout(() => setNotice(false), 7000);
+      }
+      wasAuto = p.auto;
+    });
+    return () => { off(); clearTimeout(timer); };
+  }, []);
+
+  const why = perf.auto && perf.mode === "auto" ? `Activado automáticamente: ${perf.reasons.join(", ")}.` : "";
+  const title = perf.lite
+    ? `Modo rendimiento activado. ${why} Pulsa para ver todos los efectos.`
+    : "Modo rendimiento: menos efectos para que el scroll vaya fluido en equipos modestos.";
+  return (
+    <div className="perf">
+      <button
+        type="button"
+        className="perf-toggle"
+        aria-pressed={perf.lite}
+        title={title}
+        onClick={() => { setNotice(false); setPerfMode(perf.lite ? "off" : "on"); }}
+      >
+        <span className="perf-dot" aria-hidden="true" />
+        <span className="perf-label">Rendimiento</span>
+        <span className="perf-state">{perf.lite ? (perf.mode === "auto" ? "auto" : "on") : "off"}</span>
+      </button>
+      {notice && (
+        <p className="perf-notice" role="status">
+          Activamos el modo rendimiento ({perf.reasons[perf.reasons.length - 1]}) para que el scroll vaya fluido.
+          <button type="button" onClick={() => { setNotice(false); setPerfMode("off"); }}>Ver todos los efectos</button>
+        </p>
+      )}
+    </div>
   );
 }

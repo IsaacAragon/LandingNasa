@@ -2,8 +2,11 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 import Intro from "./Intro";
 import Planet from "./Planet";
 import { scrollTop, viewportHeight } from "./scroll";
+import { probeFrameRate, usePerf } from "./perf";
 import Navbar from "./Navbar";
 import GaleTopography from "./GaleTopography";
+import GaleSurroundings from "./GaleSurroundings";
+import AresProject from "./AresProject";
 import { GALE, MOUNT_SHARP } from "./mars";
 import {
   BOXWORK_TIMELINE, DOSE, ELEMENTS, EZ_VOTES, GALE_FACTS, GALE_TIMELINE, GALLERY, METHANE, MOUNT_SHARP_KM,
@@ -16,7 +19,7 @@ import "./charts.css";
 
 /* ---------- Contenido (edita aquí) ---------- */
 const PROJECT = "Aresmap";
-const TEAM = "Equipo Aresmap";
+const TEAM = "Equipo Salomonsters";
 const REPO_URL = "#";
 const DEMO_URL = "#";
 
@@ -24,8 +27,9 @@ const fmtLat = (v: number) => `${Math.abs(v)}°${v < 0 ? "S" : "N"}`;
 const NAV_LINKS = [
   { id: "zona", label: "La zona" },
   { id: "gale", label: "Gale" },
-  { id: "topografia", label: "Topografía" },
-  { id: "expedicion", label: "Expedición" },
+  { id: "topografia", label: "Relieve" },
+  { id: "alrededores", label: "Alrededores" },
+  { id: "proyecto", label: "Proyecto" },
   { id: "capas", label: "Datos" },
 ];
 const GALE_COORDS = `${fmtLat(GALE.lat)} · ${GALE.lon}°E`;
@@ -297,8 +301,12 @@ export default function MarswalkLanding() {
   const revealed = reduced || revealedByIntro;
   const reveal = useCallback(() => setRevealed(true), []);
   const finish = useCallback(() => setIntroDone(true), []);
-  useScrollParallax(revealed && !reduced);
-  useReveal(revealed && !reduced);
+  const { lite } = usePerf();
+  // Modo rendimiento: sin paralaje ni animaciones de entrada (son las que más trabajo piden al hacer scroll)
+  useScrollParallax(revealed && !reduced && !lite);
+  useReveal(revealed && !reduced && !lite);
+  // Tras la intro se mide si el equipo sostiene la animación; si no, se activa el modo rendimiento
+  useEffect(() => { if (revealed) probeFrameRate(); }, [revealed]);
 
   return (
     <>
@@ -400,6 +408,10 @@ export default function MarswalkLanding() {
           </section>
 
           <GaleTopography />
+
+          <GaleSurroundings />
+
+          <AresProject />
 
           {/* EXPEDICIÓN: la ruta segura hasta los boxwork */}
           <section id="expedicion" className="wrap expedition">

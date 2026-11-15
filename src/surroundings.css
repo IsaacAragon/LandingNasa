@@ -1,0 +1,92 @@
+/* ==========================================================================
+   Gale y sus alrededores · ARES Map, el simulador
+   ========================================================================== */
+.around, .project { padding-block: clamp(5rem, 10vw, 9rem); }
+.around h2, .project h2 { text-transform: uppercase; }
+
+/* ---------- Mosaico con marcadores ---------- */
+.around-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--space-6); align-items: start; }
+.around-map { padding: var(--space-4); display: grid; gap: var(--space-4); }
+.around-mosaic { position: relative; aspect-ratio: 1510 / 680; }
+.around-mosaic img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.around-box {
+  position: absolute; border: 1.5px solid var(--rust-300); border-radius: 6px; pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(9, 8, 8, 0.35);          /* oscurece el resto: el área elegida resalta */
+  transition: left 420ms var(--ease-spring), top 420ms var(--ease-spring), width 420ms var(--ease-spring), height 420ms var(--ease-spring);
+}
+.around-pin {
+  position: absolute; translate: -50% -50%; width: 44px; height: 44px; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+}
+.around-pin i {
+  width: 14px; height: 14px; border-radius: 50%; background: var(--obsidian-950); border: 2px solid var(--text);
+  box-shadow: 0 0 0 3px rgba(9, 8, 8, 0.6); transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-ui) ease;
+}
+.around-pin:hover i { transform: scale(1.2); }
+.around-pin[aria-pressed="true"] i { background: #ff3b24; border-color: #ffd2c4; box-shadow: 0 0 14px #ff3b24, 0 0 0 3px rgba(9, 8, 8, 0.6); }
+.around-north {
+  position: absolute; right: 0.4rem; top: -0.2rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);
+}
+.around-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.around-tabs button {
+  display: grid; justify-items: start; gap: 0.1rem; min-height: 44px; padding: 0.45rem 0.8rem; border-radius: 10px;
+  background: var(--white-a04); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer;
+  font: inherit; font-size: 0.86rem; font-weight: 700; text-align: left;
+  transition: background-color var(--dur-ui) ease, border-color var(--dur-ui) ease, color var(--dur-ui) ease;
+}
+.around-tabs small { font-family: var(--font-mono); font-size: 0.62rem; font-weight: 400; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-subtle); }
+.around-tabs button[aria-selected="true"] { background: var(--white-a07); border-color: var(--rust-300); color: var(--text); }
+
+/* ---------- Modelo del área elegida ---------- */
+.around-model { padding: 0; overflow: hidden; display: grid; animation: panel-in 320ms var(--ease-out) both; }
+.around-model-frame { background: #0b0a0a; aspect-ratio: 14 / 9; display: grid; place-items: center; overflow: hidden; }
+/* Las láminas de Civil 3D son blancas: se invierten para el fondo oscuro manteniendo el tono de las curvas */
+.around-model-frame img { width: 100%; height: 100%; object-fit: contain; display: block; filter: invert(1) hue-rotate(180deg); }
+.around-model figcaption { display: grid; gap: 0.35rem; padding: var(--space-4) 1.3rem 1.3rem; }
+.around-model b { font-size: 1.15rem; }
+.around-model figcaption > span:last-child { color: var(--text-muted); font-size: 0.92rem; }
+
+/* ---------- ARES Map, el simulador ---------- */
+.project-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6); }
+.project-grid .card { display: grid; align-content: start; gap: var(--space-3); }
+.project-grid .card > p:not(.card-label) { color: var(--text-muted); font-size: 0.95rem; }
+.project-question { border-left: 2px solid var(--rust-500); padding-left: var(--space-4); color: var(--text) !important; font-style: italic; }
+.project-objectives { padding-left: 1.2rem; display: grid; gap: 0.5rem; color: var(--text-muted); font-size: 0.9rem; }
+.project-objectives li::marker { color: var(--rust-300); font-family: var(--font-mono); }
+.project-note { font-size: 0.85rem !important; border-top: 1px solid var(--border); padding-top: var(--space-3); }
+
+.demo-route { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-3); padding-block: var(--space-2); }
+.demo-stop { display: inline-flex; align-items: center; gap: 0.45rem; font-weight: 700; font-size: 0.92rem; }
+.demo-stop i { width: 12px; height: 12px; border-radius: 3px; background: var(--c); box-shadow: 0 0 10px var(--c); }
+.demo-line { position: relative; display: grid; justify-items: center; padding-bottom: 0.9rem; }
+.demo-line::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0.35rem; border-bottom: 2px dashed var(--border-strong); }
+.demo-line b { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.demo-line small { font-family: var(--font-mono); font-size: 0.65rem; color: var(--text-subtle); }
+
+.project-markers ul { list-style: none; padding: 0; display: grid; gap: 0.6rem; }
+.project-markers li { display: grid; grid-template-columns: 14px 1fr; gap: 0.7rem; align-items: start; }
+.project-markers li i { width: 14px; height: 14px; border-radius: 3px; margin-top: 0.2rem; }
+.project-markers b { display: block; font-size: 0.92rem; }
+.project-markers small { display: block; font-size: 0.82rem; color: var(--text-muted); }
+
+.pipeline { list-style: none; padding: 0; margin-top: var(--space-6); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); }
+.pipeline li { display: grid; align-content: start; gap: 0.45rem; position: relative; }
+.pipeline b { font-size: 1.1rem; }
+.pipeline li > span:last-child { color: var(--text-muted); font-size: 0.88rem; }
+.pipeline li:not(:last-child)::after {
+  content: "→"; position: absolute; right: -0.95rem; top: 50%; translate: 0 -50%; color: var(--rust-300); font-size: 1rem;
+}
+.project-impact { margin-top: var(--space-6); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); }
+.project-impact p:not(.card-label) { margin-top: var(--space-2); color: var(--text-muted); font-size: 0.95rem; }
+
+@media (max-width: 860px) {
+  .around-grid, .project-grid, .project-impact { grid-template-columns: 1fr; }
+  .pipeline { grid-template-columns: 1fr 1fr; }
+  .pipeline li::after { display: none; }
+}
+@media (max-width: 520px) {
+  .pipeline { grid-template-columns: 1fr; }
+  .demo-route { grid-template-columns: 1fr; justify-items: start; }
+  .demo-line { justify-items: start; }
+}
+[data-perf="lite"] .around-box { transition: none; box-shadow: none; }
