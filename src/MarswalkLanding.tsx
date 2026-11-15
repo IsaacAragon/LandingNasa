@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Intro from "./Intro";
 import Planet from "./Planet";
 import Navbar from "./Navbar";
@@ -224,17 +224,33 @@ function Shot({ g, variant }: { g: GalleryItem; variant: "feature" | "strip" | "
   );
 }
 
-const REDUCED = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+/* Preferencia de movimiento reducido. En el servidor (prerender) vale false y en el navegador
+   se lee después de hidratar: así el HTML del servidor y el del cliente coinciden. */
+const REDUCED_QUERY = "(prefers-reduced-motion: reduce)";
+function useReducedMotion() {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mq = matchMedia(REDUCED_QUERY);
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    },
+    () => matchMedia(REDUCED_QUERY).matches,
+    () => false,
+  );
+}
 
 /* ---------- Página ---------- */
 export default function MarswalkLanding() {
   const [active, setActive] = useState(0);
   const layer = LAYERS[active];
-  const [intro, setIntro] = useState(!REDUCED);       // con movimiento reducido no hay intro
-  const [revealed, setRevealed] = useState(REDUCED);
+  const reduced = useReducedMotion();
+  const [introDone, setIntroDone] = useState(false);
+  const [revealedByIntro, setRevealed] = useState(false);
+  const intro = !reduced && !introDone;                 // con movimiento reducido no hay intro
+  const revealed = reduced || revealedByIntro;
   const reveal = useCallback(() => setRevealed(true), []);
-  const finish = useCallback(() => setIntro(false), []);
-  useScrollParallax(revealed && !REDUCED);
+  const finish = useCallback(() => setIntroDone(true), []);
+  useScrollParallax(revealed && !reduced);
 
   return (
     <>
@@ -243,7 +259,7 @@ export default function MarswalkLanding() {
       <div className="grain" aria-hidden="true" />
       {intro && <Intro onReveal={reveal} onDone={finish} />}
 
-      <div className="site" data-state={revealed ? "in" : "intro"} aria-hidden={!revealed || undefined}>
+      <div className="site" data-state={revealed ? "in" : "intro"}>
         <a className="skip" href="#zona">Saltar al contenido</a>
 
         <Navbar project={PROJECT} links={NAV_LINKS} ctaHref={DEMO_URL} />

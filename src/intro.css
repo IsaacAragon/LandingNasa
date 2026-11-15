@@ -75,3 +75,9 @@
   .intro { --glow-y: calc(50% + 16.9vw); }
   .intro-vignette { background: radial-gradient(140% 60% at 50% 50%, transparent 40%, rgba(4, 5, 11, .9)); }
 }
+
+/* Movimiento reducido: la intro no se muestra ni siquiera antes de que React hidrate */
+@media (prefers-reduced-motion: reduce) {
+  .intro { display: none; }
+  .site[data-state="intro"] :is(.topbar, .hero-copy > *, .hud-card) { opacity: 1; }
+}

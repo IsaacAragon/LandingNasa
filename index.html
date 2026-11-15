@@ -2,17 +2,61 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- SEO -->
+    <title>Aresmap · El mapa para el primer paso en Marte | Cráter Gale</title>
+    <meta name="description" content="Aresmap integra siete capas de datos de Curiosity, MRO y la NASA en una sola vista para planear la primera caminata humana en el cráter Gale, de Bradbury Landing a los boxwork de Mount Sharp. NASA Space Apps Challenge." />
+    <link rel="canonical" href="https://aresmap.dev/" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="author" content="Equipo Aresmap" />
+
+    <!-- Al compartir en redes (Open Graph y X/Twitter) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Aresmap" />
+    <meta property="og:locale" content="es_ES" />
+    <meta property="og:url" content="https://aresmap.dev/" />
+    <meta property="og:title" content="Aresmap · El mapa para el primer paso en Marte" />
+    <meta property="og:description" content="Siete capas de datos de la NASA para planear la primera caminata humana en el cráter Gale. NASA Space Apps Challenge." />
+    <meta property="og:image" content="https://aresmap.dev/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Logo de Aresmap sobre fondo oscuro con el texto: El mapa para el primer paso en Marte, cráter Gale." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Aresmap · El mapa para el primer paso en Marte" />
+    <meta name="twitter:description" content="Siete capas de datos de la NASA para planear la primera caminata humana en el cráter Gale." />
+    <meta name="twitter:image" content="https://aresmap.dev/og-image.png" />
+
+    <!-- Datos estructurados (schema.org) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Aresmap",
+        "url": "https://aresmap.dev/",
+        "inLanguage": "es",
+        "description": "Mapa en capas del cráter Gale en Marte con datos de Curiosity, MRO y la NASA para planear una caminata de astronautas. Proyecto para el NASA Space Apps Challenge.",
+        "about": { "@type": "Place", "name": "Cráter Gale, Marte", "geo": { "@type": "GeoCoordinates", "latitude": -5.4, "longitude": 137.8 } }
+      }
+    </script>
+
+    <!-- Íconos -->
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="theme-color" content="#090808" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Aresmap · El mapa para el primer paso en Marte</title>
-    <meta name="description" content="Aresmap integra seis capas de datos de la NASA para planear una caminata en el cráter Jezero. NASA Space Apps Challenge." />
+
+    <!-- Sin JavaScript (o mientras carga) el contenido igual se ve: se oculta la intro en video -->
+    <noscript>
+      <style>
+        .intro, .planet-layer, .stars { display: none !important; }
+        .site[data-state="intro"] :is(.topbar, .hero-copy > *, .hud-card) { opacity: 1 !important; }
+      </style>
+    </noscript>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><!--app-html--></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,10 +1,16 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
+import { StrictMode } from "react";
+import { createRoot, hydrateRoot } from "react-dom/client";
+import "./index.css";
+import App from "./App.tsx";
 
-createRoot(document.getElementById('root')!).render(
+const root = document.getElementById("root")!;
+const app = (
   <StrictMode>
     <App />
-  </StrictMode>,
-)
+  </StrictMode>
+);
+
+// En producción el HTML ya viene renderizado (prerender): React lo hidrata y toma el control.
+// En `pnpm dev` el contenedor llega vacío y se renderiza desde cero.
+if (root.firstElementChild) hydrateRoot(root, app);
+else createRoot(root).render(app);
