@@ -77,7 +77,7 @@ export default function Navbar({ project, links, ctaHref }: { project: string; l
         <div className="topbar-actions">
           <LangSwitch />
           <PerfToggle />
-          <a className="topbar-cta" href={ctaHref}>{t("Ver demo", "View demo")} <span aria-hidden="true">↗</span></a>
+          <a className="topbar-cta" href={ctaHref} target="_blank" rel="noopener">{t("Ver demo", "View demo")} <span aria-hidden="true">↗</span></a>
         </div>
       </div>
       <i className="topbar-progress" ref={bar} aria-hidden="true" />

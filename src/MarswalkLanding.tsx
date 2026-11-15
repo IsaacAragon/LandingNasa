@@ -21,8 +21,8 @@ import "./charts.css";
 /* ---------- Contenido (edita aquí) ---------- */
 const PROJECT = "Aresmap";
 const TEAM: Bi = { en: "Team Salomonsters", es: "Equipo Salomonsters" };
-const REPO_URL = "#";
-const DEMO_URL = "#";
+const REPO_URL = "https://github.com/IsaacAragon/ARES-Map";
+const DEMO_URL = "https://youtu.be/TRdoLomoA5I";
 
 const fmtLat = (v: number) => `${Math.abs(v)}°${v < 0 ? "S" : "N"}`;
 const NAV_LINKS: { id: string; label: Bi }[] = [
@@ -523,8 +523,7 @@ export default function MarswalkLanding() {
             <div className="card close-card">
               <h2 data-speed="0.05">{t("Marte ya está mapeado. ", "Mars is already mapped. ")}<span>{t("Falta hacerlo caminable.", "Now it needs to be walkable.")}</span></h2>
               <div className="actions">
-                <a className="btn btn-primary" href={DEMO_URL}>{t("Ver la solución", "See the solution")} <span aria-hidden="true">→</span></a>
-                <a className="btn btn-glass" href={REPO_URL}>{t("Código en GitHub", "Code on GitHub")}</a>
+                <a className="btn btn-glass" href={REPO_URL} target="_blank" rel="noopener">{t("Código en GitHub", "Code on GitHub")}</a>
               </div>
             </div>
           </section>
