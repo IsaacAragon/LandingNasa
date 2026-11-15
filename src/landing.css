@@ -204,8 +204,8 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
   white-space: nowrap; padding-left: 0.65rem; border-left: 1px solid var(--border-strong);
   font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.04em; color: var(--text-subtle);
 }
-.brand svg { flex: none; transition: transform var(--dur-ui) var(--ease-out); }
-@media (hover: hover) and (pointer: fine) { .brand:hover svg { transform: rotate(-12deg); } }
+.brand .logo-img { flex: none; display: block; transition: transform var(--dur-ui) var(--ease-out); }
+@media (hover: hover) and (pointer: fine) { .brand:hover .logo-img { transform: scale(1.06); } }
 /* El destino del logo late como el punto rojo de Gale en el planeta */
 .logo-target { transform-box: fill-box; transform-origin: center; animation: target 2.4s ease-in-out infinite; }
 @keyframes target { 50% { opacity: 0.45; transform: scale(0.75); } }
@@ -235,7 +235,7 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
 @media (max-width: 600px) {
   .topbar-inner { grid-template-columns: auto 1fr; gap: var(--space-2); min-height: 52px; }
   .brand { gap: 0.4rem; min-height: 40px; }
-  .brand svg { width: 22px; height: 22px; }
+  .brand .logo-img { width: 24px; height: 24px; }
   .brand-name { font-size: 0.8rem; letter-spacing: 0.12em; }
   .topbar-actions { gap: var(--space-2); justify-content: flex-end; }
   .topbar-cta { display: none; }
