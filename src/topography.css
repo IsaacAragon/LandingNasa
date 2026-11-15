@@ -1,0 +1,66 @@
+/* ==========================================================================
+   Plano topográfico de Gale
+   ========================================================================== */
+.topo { padding-block: clamp(5rem, 10vw, 9rem); }
+.topo h2 { text-transform: uppercase; }
+.topo-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: var(--space-6); align-items: start; }
+
+.topo-map { padding: var(--space-4); display: grid; gap: var(--space-4); }
+.topo-title { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-6); padding: var(--space-2) var(--space-2) 0; }
+.topo-title b { font-family: var(--font-mono); font-weight: 500; font-size: 0.95rem; letter-spacing: 0.14em; text-transform: uppercase; }
+.topo-title span { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); }
+
+/* Lámina: fondo de plano con retícula muy suave detrás de las curvas */
+.topo-map-frame {
+  position: relative; display: block; border-radius: 18px; overflow: hidden; aspect-ratio: 1400 / 1358;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 39px, rgba(255, 255, 255, 0.025) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 39px, rgba(255, 255, 255, 0.025) 39px 40px),
+    #0c0b0b;
+  border: 1px solid var(--border);
+}
+.topo-map-frame img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0.88; transition: opacity var(--dur-ui) ease; }
+@media (hover: hover) and (pointer: fine) { .topo-map-frame:hover img { opacity: 1; } }
+
+/* Punto rojo parpadeante en Bradbury Landing, igual que en el planeta */
+.topo-pin { position: absolute; translate: -50% -50%; display: grid; place-items: center; pointer-events: none; }
+.topo-pin i { position: relative; width: 12px; height: 12px; border-radius: 50%; background: #ff3b24; box-shadow: 0 0 12px #ff3b24; animation: pin-blink 1.2s ease-in-out infinite; }
+.topo-pin i::after {
+  content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1.5px solid #ff6a50;
+  animation: pin-ping 1.8s var(--ease-out) infinite;
+}
+.topo-pin small {
+  position: absolute; left: calc(100% + 4px); top: 50%; translate: 0 -50%; white-space: nowrap;
+  padding: 0.25rem 0.55rem; border-radius: 8px; background: rgba(9, 8, 8, 0.85); border: 1px solid var(--white-a14);
+  font-family: var(--font-mono); font-size: 0.68rem; color: var(--text);
+}
+@keyframes pin-blink { 50% { opacity: 0.45; } }
+@keyframes pin-ping { from { opacity: 0.9; transform: scale(0.6); } to { opacity: 0; transform: scale(2.4); } }
+.topo-zoom {
+  position: absolute; right: 0.8rem; bottom: 0.8rem; padding: 0.3rem 0.7rem; border-radius: 8px;
+  background: rgba(9, 8, 8, 0.8); border: 1px solid var(--white-a14); font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted);
+}
+
+/* Perfiles */
+.topo-side { display: grid; gap: var(--space-4); }
+.topo-profile { padding: var(--space-4) var(--space-4) var(--space-3); display: grid; gap: var(--space-3); }
+.topo-profile figcaption { display: grid; gap: 0.45rem; padding: 0 var(--space-2); }
+.topo-profile b { font-size: 1rem; letter-spacing: -0.01em; }
+.topo-meta { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.topo-meta span {
+  padding: 0.15rem 0.5rem; border-radius: 6px; border: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); white-space: nowrap;
+}
+.topo-profile img { width: 100%; height: auto; display: block; }
+.topo-notes ul { list-style: none; padding: 0; margin-top: var(--space-3); display: grid; gap: 0.45rem; }
+.topo-notes li { position: relative; padding-left: 1rem; font-size: 0.85rem; color: var(--text-muted); }
+.topo-notes li::before { content: "—"; position: absolute; left: 0; color: var(--text-subtle); }
+
+@media (max-width: 860px) {
+  .topo-grid { grid-template-columns: 1fr; }
+  .topo-map { padding: var(--space-3); }
+  .topo-pin small { font-size: 0.62rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .topo-pin i, .topo-pin i::after { animation: none; }
+}

@@ -135,7 +135,7 @@ export default function Intro({ onReveal, onDone }: Props) {
       <div className="intro-layer intro-vignette" aria-hidden="true" />
       <div ref={flash} className="intro-layer intro-flash" aria-hidden="true" />
       <div ref={near} className="intro-layer intro-ui">
-        <span className="intro-coord" aria-hidden="true">Aproximación · 18.44°N 77.45°E</span>
+        <span className="intro-coord" aria-hidden="true">Aproximación · 5.4°S 137.8°E · Gale</span>
         <button className="intro-skip" onClick={skip}>
           Entrar
           <span className="intro-bar" aria-hidden="true"><i ref={bar} /></span>

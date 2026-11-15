@@ -185,33 +185,57 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
 .section-head { display: grid; gap: var(--space-6); justify-items: start; margin-bottom: var(--space-12); }
 
 /* ==========================================================================
-   Encabezado flotante tipo Dynamic Island
+   Barra superior tipo plano técnico
+   Transparente arriba; al bajar, fondo sólido con una línea fina y el avance de lectura.
    ========================================================================== */
-.nav-wrap { position: sticky; top: var(--space-4); z-index: 50; pointer-events: none; }
-.nav {
-  pointer-events: auto; width: min(100% - 2rem, 72rem); margin-inline: auto; min-height: 3.6rem;
-  display: flex; align-items: center; justify-content: space-between; gap: var(--space-6);
-  padding: 0.4rem 0.5rem 0.4rem 1.4rem; border-radius: var(--radius-pill);
-  background: var(--nav-bg); border: 1px solid var(--white-a09);
-  backdrop-filter: blur(28px) saturate(190%); -webkit-backdrop-filter: blur(28px) saturate(190%);
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), var(--highlight);
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  border-bottom: 1px solid transparent;
+  transition: background-color var(--dur-ui) ease, border-color var(--dur-ui) ease;
 }
-.brand {
-  display: inline-flex; align-items: center; gap: 0.6rem; min-height: 44px;
-  font-weight: 900; font-size: 1.05rem; letter-spacing: 0.18em; text-transform: uppercase; text-decoration: none;
+.topbar[data-scrolled="true"] { background: rgba(9, 8, 8, 0.92); border-bottom-color: var(--border); }
+.topbar-inner { min-height: 60px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-8); }
+.brand { display: inline-flex; align-items: center; gap: 0.65rem; min-height: 44px; text-decoration: none; }
+.brand-name { font-weight: 900; font-size: 0.98rem; letter-spacing: 0.2em; text-transform: uppercase; }
+.brand-meta {
+  padding-left: 0.65rem; border-left: 1px solid var(--border-strong);
+  font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.04em; color: var(--text-subtle);
 }
-.brand svg { flex: none; filter: drop-shadow(0 0 10px rgba(210, 84, 42, 0.35)); transition: transform var(--dur-ui) var(--ease-out); }
-@media (hover: hover) and (pointer: fine) { .brand:hover svg { transform: rotate(-12deg) scale(1.06); } }
+.brand svg { flex: none; transition: transform var(--dur-ui) var(--ease-out); }
+@media (hover: hover) and (pointer: fine) { .brand:hover svg { transform: rotate(-12deg); } }
 /* El destino del logo late como el punto rojo de Gale en el planeta */
 .logo-target { transform-box: fill-box; transform-origin: center; animation: target 2.4s ease-in-out infinite; }
 @keyframes target { 50% { opacity: 0.45; transform: scale(0.75); } }
-.nav ul { display: flex; gap: var(--space-1); list-style: none; padding: 0; }
-.nav ul a {
-  display: inline-flex; min-height: 40px; align-items: center; padding: 0 0.95rem; border-radius: var(--radius-pill);
-  color: var(--platinum-300); font-size: 0.86rem; font-weight: 600; text-decoration: none;
-  transition: background-color var(--dur-ui) ease, color var(--dur-ui) ease;
+
+.topbar nav { justify-self: center; }
+.topbar ol { display: flex; gap: var(--space-6); list-style: none; padding: 0; }
+.topbar ol a {
+  position: relative; display: inline-flex; align-items: baseline; gap: 0.45rem; min-height: 44px; align-items: center;
+  font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted); text-decoration: none; transition: color var(--dur-ui) ease;
 }
-.nav ul a:hover { background: var(--white-a07); color: var(--text); }
+.topbar ol a span { color: var(--text-subtle); font-size: 0.66rem; }
+.topbar ol a::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 8px; height: 1px; background: var(--rust-500);
+  transform: scaleX(0); transform-origin: left; transition: transform 260ms var(--ease-out);
+}
+.topbar ol a:hover { color: var(--text); }
+.topbar ol a[aria-current] { color: var(--text); }
+.topbar ol a[aria-current]::after { transform: scaleX(1); }
+.topbar ol a[aria-current] span { color: var(--rust-300); }
+.topbar-cta {
+  display: inline-flex; align-items: center; gap: 0.35rem; min-height: 44px;
+  font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border-strong);
+  transition: border-color var(--dur-ui) ease, color var(--dur-ui) ease;
+}
+.topbar-cta:hover { border-color: var(--rust-500); color: var(--rust-300); }
+.topbar-progress {
+  position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--rust-500);
+  transform: scaleX(0); transform-origin: left; will-change: transform;
+}
+
+@media (max-width: 1180px) { .brand-meta { display: none; } .topbar ol { gap: var(--space-4); } }
 
 /* ==========================================================================
    Hero: texto a la izquierda, el planeta (capa fija) gira a la derecha
@@ -418,8 +442,8 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
 @keyframes drop { from { opacity: 0; transform: translateY(-14px) scale(0.97); } }
 @keyframes surface { from { opacity: 0; transform: scale(1.12); filter: blur(8px); } }
 @keyframes arrive { from { opacity: 0; transform: scale(1.6); } }
-.site[data-state="intro"] :is(.nav, .hero-copy > *, .hud-card) { opacity: 0; }
-.site[data-state="in"] .nav { animation: drop var(--dur-reveal) var(--ease-spring) 0.5s both; }
+.site[data-state="intro"] :is(.topbar, .hero-copy > *, .hud-card) { opacity: 0; }
+.site[data-state="in"] .topbar { animation: drop var(--dur-reveal) var(--ease-spring) 0.5s both; }
 .site[data-state="in"] .hero-copy > * { animation: rise var(--dur-reveal) var(--ease-spring) both; }
 .site[data-state="in"] .hero-copy > :nth-child(1) { animation-delay: 0.1s; }
 .site[data-state="in"] .hero h1 { animation: surface 1.2s var(--ease-spring) 0.15s both; }
@@ -445,8 +469,18 @@ h2 { font-size: clamp(2.2rem, 5vw, 4.2rem); }
    Móvil
    ========================================================================== */
 @media (max-width: 860px) {
-  .nav ul { display: none; }
-  .nav { padding-left: 1.1rem; }
+  .topbar nav, .brand-meta { display: none; }
+  .topbar-inner { grid-template-columns: 1fr auto; gap: var(--space-4); }
+  /* Zona: en móvil solo se ve el paso activo, así el texto no choca con la ruta */
+  .zone-steps { padding: var(--space-2); }
+  .zone-steps li { display: none; }
+  .zone[data-step="0"] li[data-i="0"], .zone[data-step="1"] li[data-i="1"],
+  .zone[data-step="2"] li[data-i="2"], .zone[data-step="3"] li[data-i="3"] { display: grid; }
+  .zone .kicker { display: none; }
+  /* Cifras de la expedición: una debajo de otra */
+  .stats { grid-template-columns: 1fr; gap: var(--space-3); }
+  .stats div { display: flex; align-items: baseline; gap: var(--space-3); }
+  .fact dt { font-size: 1.15rem; }
   .hero { grid-template-columns: 1fr; padding-top: 46svh; min-height: 100svh; }
   .hero-hud { display: none; }
   .scroll-cue { display: none; }

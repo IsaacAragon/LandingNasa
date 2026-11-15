@@ -4,7 +4,9 @@
   "compatibility_date": "2026-11-14",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
+    // La landing no tiene rutas internas (solo anclas #): un archivo que no existe debe dar 404,
+    // no index.html. Así /favicon.ico u otros íconos nunca reciben HTML por error.
+    "not_found_handling": "404-page"
   },
   "routes": [
     { "pattern": "aresmap.dev", "custom_domain": true }

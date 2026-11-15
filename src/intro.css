@@ -5,6 +5,8 @@
 .intro {
   /* Punto del planeta hacia el que se hunde la cámara */
   --focus-x: 50%; --focus-y: 80%;
+  /* Mismo punto en las capas a pantalla completa (halo y velo) */
+  --glow-x: var(--focus-x); --glow-y: var(--focus-y);
   position: fixed; inset: 0; z-index: 50; overflow: hidden;
   background: var(--void);
   contain: strict;
@@ -19,8 +21,8 @@
 
 /* Halo cálido sobre el horizonte: capa intermedia */
 .intro-glow {
-  background: radial-gradient(40% 32% at var(--focus-x) var(--focus-y), rgba(234, 184, 135, .55), rgba(210, 84, 42, .25) 45%, transparent 72%);
-  transform-origin: var(--focus-x) var(--focus-y);
+  background: radial-gradient(40% 32% at var(--glow-x) var(--glow-y), rgba(234, 184, 135, .55), rgba(210, 84, 42, .25) 45%, transparent 72%);
+  transform-origin: var(--glow-x) var(--glow-y);
   will-change: transform, opacity;
 }
 .intro-vignette { background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(4, 5, 11, .85)); will-change: auto; }
@@ -28,7 +30,7 @@
 /* Velo final: sustituye al desenfoque y al brillo, cuesta casi nada */
 .intro-flash {
   opacity: 0;
-  background: radial-gradient(90% 80% at var(--focus-x) var(--focus-y), #e9a877, #b8532c 55%, #3a1810);
+  background: radial-gradient(90% 80% at var(--glow-x) var(--glow-y), #e9a877, #b8532c 55%, #3a1810);
   will-change: opacity;
 }
 
@@ -60,7 +62,16 @@
 }
 
 @media (max-width: 860px) {
-  .intro { --focus-y: 72%; }
   .intro-coord { left: 1.2rem; }
   .intro-skip { right: 1.2rem; bottom: 1.4rem; }
+}
+
+/* Pantallas verticales (móvil): el video se muestra completo y horizontal,
+   a todo el ancho y centrado, en vez de recortarse en vertical. */
+@media (orientation: portrait) {
+  .intro-layer:first-child { inset: 0; display: grid; align-items: center; }
+  .intro-video { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
+  /* El planeta queda en la franja del video: 50 % + 30 % de su alto (56.25vw) */
+  .intro { --glow-y: calc(50% + 16.9vw); }
+  .intro-vignette { background: radial-gradient(140% 60% at 50% 50%, transparent 40%, rgba(4, 5, 11, .9)); }
 }

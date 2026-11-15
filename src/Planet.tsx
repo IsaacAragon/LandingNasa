@@ -357,8 +357,8 @@ export default function Planet({ active, focusId, exitId }: Props) {
         const card = document.querySelector<HTMLElement>(anchorSel);
         const show = (1 - smooth(clamp01(a * 2))) * dotOn;
         const g = project(0, 0, lon, tilt, cx, cy, radius);
-        if (card && show > 0.01 && g.visible) {
-          const r = card.getBoundingClientRect();
+        const r = card?.getBoundingClientRect();
+        if (r && r.width > 0 && show > 0.01 && g.visible) {     // en móvil la tarjeta está oculta: sin línea
           const sx = r.left + 34, sy = r.bottom;                      // sale del icono, por debajo de la tarjeta
           line.style.opacity = String(show);
           line.setAttribute("d", `M${sx.toFixed(1)} ${sy.toFixed(1)} L${sx.toFixed(1)} ${(sy + 16).toFixed(1)} L${g.x.toFixed(1)} ${g.y.toFixed(1)}`);

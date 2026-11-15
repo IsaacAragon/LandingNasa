@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Intro from "./Intro";
 import Planet from "./Planet";
-import Logo from "./Logo";
+import Navbar from "./Navbar";
+import GaleTopography from "./GaleTopography";
 import { GALE, MOUNT_SHARP } from "./mars";
 import {
   BOXWORK_TIMELINE, DOSE, ELEMENTS, EZ_VOTES, GALE_FACTS, GALE_TIMELINE, GALLERY, METHANE, MOUNT_SHARP_KM,
@@ -19,6 +20,13 @@ const REPO_URL = "#";
 const DEMO_URL = "#";
 
 const fmtLat = (v: number) => `${Math.abs(v)}°${v < 0 ? "S" : "N"}`;
+const NAV_LINKS = [
+  { id: "zona", label: "La zona" },
+  { id: "gale", label: "Gale" },
+  { id: "topografia", label: "Topografía" },
+  { id: "expedicion", label: "Expedición" },
+  { id: "capas", label: "Datos" },
+];
 const GALE_COORDS = `${fmtLat(GALE.lat)} · ${GALE.lon}°E`;
 
 /* Cráter Gale: la zona habitable */
@@ -146,7 +154,11 @@ function useScrollParallax(enabled: boolean) {
         const prev = applied.get(el) ?? 0;
         const top = r.top - prev;
         if (top > vh * 1.5 || top + r.height < -vh * 0.5) continue;   // lejos de pantalla: no se toca
-        next.push([el, (top + r.height / 2 - mid) * -speed.get(el)!]);
+        let offset = (top + r.height / 2 - mid) * -speed.get(el)!;
+        // data-clamp: tope relativo al alto (imágenes dentro de un marco con margen de escala)
+        const k = Number(el.dataset.clamp);
+        if (k) offset = Math.max(-r.height * k, Math.min(r.height * k, offset));
+        next.push([el, offset]);
       }
       for (const [el, offset] of next) {
         if (Math.abs((applied.get(el) ?? 0) - offset) < 0.1) continue;
@@ -200,7 +212,7 @@ function Shot({ g, variant }: { g: GalleryItem; variant: "feature" | "strip" | "
   return (
     <figure className={`card shot shot-${variant}`}>
       <div className="shot-media">
-        <img src={g.src} width={g.w} height={g.h} alt={`${g.title}. ${g.text}`} loading="lazy" decoding="async" data-speed="0.05" />
+        <img src={g.src} width={g.w} height={g.h} alt={`${g.title}. ${g.text}`} loading="lazy" decoding="async" data-speed="0.05" data-clamp="0.06" />
       </div>
       <figcaption>
         <span className="card-label">{g.date} · {g.id}</span>
@@ -234,19 +246,7 @@ export default function MarswalkLanding() {
       <div className="site" data-state={revealed ? "in" : "intro"} aria-hidden={!revealed || undefined}>
         <a className="skip" href="#zona">Saltar al contenido</a>
 
-        <header className="nav-wrap">
-          <div className="nav">
-            <a href="#top" className="brand" aria-label={`${PROJECT}, inicio`}><Logo size={30} /><span>{PROJECT}</span></a>
-            <nav aria-label="Principal">
-              <ul>
-                <li><a href="#zona">La zona</a></li>
-                <li><a href="#expedicion">La expedición</a></li>
-                <li><a href="#capas">Datos</a></li>
-              </ul>
-            </nav>
-            <a className="btn btn-glass btn-sm" href={DEMO_URL}>Ver demo</a>
-          </div>
-        </header>
+        <Navbar project={PROJECT} links={NAV_LINKS} ctaHref={DEMO_URL} />
 
         <main id="top">
           {/* HERO: el planeta gira a la derecha (capa fija), el texto flota encima */}
@@ -334,6 +334,8 @@ export default function MarswalkLanding() {
               </ol>
             </div>
           </section>
+
+          <GaleTopography />
 
           {/* EXPEDICIÓN: la ruta segura hasta los boxwork */}
           <section id="expedicion" className="wrap expedition">
